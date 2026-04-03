@@ -1,0 +1,4308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FIBER LASER POWER CALC</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Fluid base font — scales with viewport, JS overrides for font size setting ── */
+  html { font-size: clamp(15px, 1vw, 20px); }
+
+  /* ── Dark theme (default) ── */
+  :root {
+    --bg:        #0a0b0c;
+    --panel:     #141618;
+    --panel2:    #1a1e21;
+    --border:    #323a40;
+    --amber:     #ff8c00;
+    --amber-dim: #7a4200;
+    --red:       #ff4444;
+    --green:     #00e676;
+    --cyan:      #00bcd4;
+    --purple:    #b57aff;
+    --text:      #dde3e8;
+    --text-dim:  #7a8f9a;
+    --text-faint:#3d5260;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+    --max-w: 960px;
+    --transition: background 0.25s, color 0.25s, border-color 0.25s;
+  }
+
+  /* ── Light theme ── */
+  body.light {
+    --bg:        #f0f2f4;
+    --panel:     #ffffff;
+    --panel2:    #e8ebed;
+    --border:    #c8d0d6;
+    --amber:     #b85c00;
+    --amber-dim: #7a3d00;
+    --red:       #cc2222;
+    --green:     #007a3d;
+    --cyan:      #006b7a;
+    --purple:    #6b3dbf;
+    --text:      #1a2228;
+    --text-dim:  #4a5c68;
+    --text-faint:#9aaab4;
+  }
+  body.light { background-image: none; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--mono);
+    min-height: 100vh; padding: 24px 16px 48px;
+    transition: var(--transition);
+    background-image:
+      radial-gradient(ellipse 80% 40% at 50% 0%, rgba(255,120,0,0.04) 0%, transparent 70%),
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,140,0,0.03) 39px, rgba(255,140,0,0.03) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,140,0,0.02) 39px, rgba(255,140,0,0.02) 40px);
+  }
+
+  /* ── Stretch mode ── */
+  body.stretch { --max-w: 95vw; }
+
+  header {
+    display: flex; align-items: center; gap: 16px;
+    margin: 0 auto 24px; padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    max-width: var(--max-w);
+    transition: var(--transition);
+  }
+  .laser-icon { width: 36px; height: 36px; flex-shrink: 0; }
+  .laser-icon svg { width: 100%; height: 100%; }
+  header h1 { font-family: var(--sans); font-weight: 700; font-size: 1.5rem; letter-spacing: 0.2em; color: var(--amber); text-transform: uppercase; }
+  header p  { font-size: 0.72rem; color: var(--text-dim); letter-spacing: 0.1em; margin-top: 2px; }
+  .version  { font-size: 0.65rem; color: var(--text-dim); border: 1px solid var(--border); padding: 2px 8px; letter-spacing: 0.15em; }
+
+  .db-btn {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase;
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    padding: 4px 10px; cursor: pointer; transition: border-color 0.2s, color 0.2s;
+  }
+  .db-btn:hover { border-color: var(--amber-dim); color: var(--amber); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px; max-width: var(--max-w); margin: 0 auto;
+    transition: max-width 0.3s;
+  }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 20px; position: relative; transition: var(--transition);
+  }
+  .panel::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--amber), transparent); }
+  .panel.full { grid-column: 1 / -1; }
+
+  .panel-title {
+    font-family: var(--sans); font-weight: 700; font-size: 0.72rem;
+    letter-spacing: 0.25em; text-transform: uppercase; color: var(--amber);
+    margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* laser type badge */
+  .type-badge { font-size: 0.58rem; padding: 2px 6px; letter-spacing: 0.1em; border: 1px solid; margin-left: 4px; vertical-align: middle; font-family: var(--mono); }
+  .type-badge.mopa   { color: var(--cyan);   border-color: rgba(0,188,212,0.4);   background: rgba(0,188,212,0.08); }
+  .type-badge.qsw    { color: var(--purple);  border-color: rgba(181,122,255,0.4); background: rgba(181,122,255,0.08); }
+  .type-badge.custom { color: var(--amber);  border-color: rgba(255,140,0,0.4);   background: rgba(255,140,0,0.08); }
+
+  .brand-model-row { display: grid; grid-template-columns: 180px 1fr; gap: 10px; margin-bottom: 10px; }
+  @media (max-width: 500px) { .brand-model-row { grid-template-columns: 1fr; } }
+
+  .sel-wrap { position: relative; }
+  .sel-wrap select {
+    width: 100%; background: var(--bg); border: 1px solid var(--amber-dim);
+    color: var(--amber); font-family: var(--mono); font-size: 0.9rem;
+    padding: 9px 36px 9px 10px; outline: none;
+    -webkit-appearance: none; appearance: none; cursor: pointer; letter-spacing: 0.04em;
+    transition: var(--transition);
+  }
+  .sel-wrap select:focus { border-color: var(--amber); }
+  .sel-wrap select option { background: var(--panel); color: var(--text); }
+  .sel-wrap::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--amber); pointer-events: none; font-size: 0.75rem; }
+
+  .model-badge { font-size: 0.62rem; color: var(--text-dim); letter-spacing: 0.07em; margin-bottom: 14px; line-height: 1.8; min-height: 1.2em; }
+  .model-badge span { color: var(--cyan); }
+  .model-badge .edit-link { color: var(--amber-dim); cursor: pointer; margin-left: 8px; text-decoration: underline; font-size: 0.6rem; }
+  .model-badge .edit-link:hover { color: var(--amber); }
+
+  .sep { height: 1px; background: var(--border); margin: 14px 0; }
+  .small-note { font-size: 0.62rem; color: var(--text-dim); margin-top: 6px; letter-spacing: 0.05em; line-height: 1.6; }
+
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  label { font-size: 0.65rem; letter-spacing: 0.12em; color: var(--text-dim); text-transform: uppercase; }
+
+  .input-wrap { position: relative; display: flex; align-items: center; }
+  .input-wrap input[type="number"],
+  .input-wrap select {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 0.95rem;
+    padding: 8px 44px 8px 10px; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -moz-appearance: textfield; -webkit-appearance: none; appearance: none; cursor: pointer;
+  }
+  .input-wrap input[type="number"]::-webkit-inner-spin-button,
+  .input-wrap input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .input-wrap input[type="number"]:focus,
+  .input-wrap select:focus { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber-dim), inset 0 0 8px rgba(255,140,0,0.05); }
+  .input-wrap select option { background: var(--panel); color: var(--text); }
+  .unit { position: absolute; right: 8px; font-size: 0.62rem; color: var(--text-dim); letter-spacing: 0.05em; pointer-events: none; }
+
+  .qsw-pulse-display {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text-dim); font-family: var(--mono); font-size: 0.95rem;
+    padding: 8px 10px; width: 100%;
+  }
+
+  /* ── Display settings trigger button ── */
+  .ds-trigger {
+    margin-top: 6px;
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase;
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    padding: 3px 10px; cursor: pointer; transition: border-color 0.2s, color 0.2s;
+    display: inline-block;
+  }
+  .ds-trigger:hover, .ds-trigger.open { border-color: var(--amber); color: var(--amber); }
+
+  /* ── Display settings popover ── */
+  .ds-popover {
+    display: none;
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 200;
+    width: 280px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--amber);
+    padding: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .ds-popover.open { display: block; }
+  .ds-popover-inner { display: flex; flex-direction: column; gap: 16px; }
+
+  /* Slider */
+  .slider-section { margin-top: 4px; }
+  .slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
+
+  input[type="range"] {
+    width: 100%; -webkit-appearance: none; appearance: none;
+    height: 6px; outline: none; cursor: pointer;
+    border-radius: 3px;
+    background: linear-gradient(to right, var(--amber) 0%, var(--amber) var(--pct, 0%), var(--border) var(--pct, 0%), var(--border) 100%);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    background: var(--bg);
+    border: 2px solid var(--amber);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(255,140,0,0.5);
+    transition: box-shadow 0.2s, transform 0.1s;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 20px; height: 20px;
+    background: var(--bg);
+    border: 2px solid var(--amber);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(255,140,0,0.5);
+  }
+  input[type="range"]:hover::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px rgba(255,140,0,0.15), 0 0 10px rgba(255,140,0,0.5);
+    transform: scale(1.1);
+  }
+  input[type="range"]::-webkit-slider-runnable-track { border-radius: 3px; }
+  input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--border); }
+  input[type="range"]::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--amber); }
+
+  .tick-row { display: flex; justify-content: space-between; margin-top: 6px; }
+  .tick { font-size: 0.58rem; color: var(--text-dim); }
+
+  .freq-manual { width: 110px; flex-shrink: 0; position: relative; display: flex; align-items: center; }
+  .freq-manual input { width: 100%; background: var(--bg); border: 1px solid var(--amber-dim); color: var(--amber); font-family: var(--mono); font-size: 1rem; padding: 5px 36px 5px 8px; outline: none; -moz-appearance: textfield; transition: border-color 0.2s; }
+  .freq-manual input::-webkit-inner-spin-button, .freq-manual input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .freq-manual input:focus { border-color: var(--amber); }
+  .freq-manual .unit { color: var(--amber-dim); font-size: 0.62rem; }
+
+  /* Outputs */
+  .output-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 12px; }
+  .readout { background: var(--panel2); border: 1px solid var(--border); padding: 16px; position: relative; overflow: hidden; transition: var(--transition); }
+  .readout::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; }
+  .readout.warn::after  { background: var(--red); }
+  .readout.ok::after    { background: var(--green); }
+  .readout.info::after  { background: var(--cyan); }
+  .readout.amber::after { background: var(--amber); }
+  .readout-label { font-size: 0.62rem; letter-spacing: 0.15em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 8px; }
+  .readout-value { font-size: 2rem; font-family: var(--mono); line-height: 1; margin-bottom: 4px; transition: color 0.3s; }
+  .readout.warn  .readout-value { color: var(--red);   text-shadow: 0 0 12px rgba(255,68,68,0.4); }
+  .readout.ok    .readout-value { color: var(--green); text-shadow: 0 0 12px rgba(0,230,118,0.3); }
+  .readout.info  .readout-value { color: var(--cyan);  text-shadow: 0 0 12px rgba(0,188,212,0.3); }
+  .readout.amber .readout-value { color: var(--amber); text-shadow: 0 0 12px rgba(255,140,0,0.3); }
+  .readout-unit { font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.1em; }
+  .clamped-badge { display: none; font-size: 0.55rem; letter-spacing: 0.12em; padding: 1px 6px; background: rgba(255,51,51,0.15); border: 1px solid rgba(255,51,51,0.4); color: var(--red); margin-left: 6px; }
+  .clamped-badge.show { display: inline-block; }
+  .warning-bar { display: none; margin-top: 10px; padding: 6px 10px; background: rgba(255,51,51,0.08); border: 1px solid rgba(255,51,51,0.3); border-left: 3px solid var(--red); font-size: 0.65rem; color: var(--red); letter-spacing: 0.08em; }
+  .warning-bar.visible { display: block; }
+
+  .add-laser-btn { width: 100%; background: transparent; border: 1px dashed var(--border); color: var(--text-dim); font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.15em; padding: 8px; cursor: pointer; transition: border-color 0.2s, color 0.2s; text-transform: uppercase; margin-top: 12px; }
+  .add-laser-btn:hover { border-color: var(--amber-dim); color: var(--amber); }
+
+  /* ── Display Settings panel ── */
+  .ds-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .ds-row:last-child { margin-bottom: 0; }
+  .ds-label { font-size: 0.65rem; letter-spacing: 0.12em; color: var(--text-dim); text-transform: uppercase; }
+  .ds-note  { font-size: 0.58rem; color: var(--text-faint); letter-spacing: 0.05em; margin-top: 2px; }
+
+  /* Toggle switch */
+  .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0; background: var(--border);
+    cursor: pointer; transition: background 0.2s; border-radius: 0;
+  }
+  .toggle input:checked + .toggle-track { background: var(--amber); }
+  .toggle-thumb {
+    position: absolute; top: 4px; left: 4px;
+    width: 16px; height: 16px; background: var(--bg);
+    transition: transform 0.2s; pointer-events: none;
+    transform: rotate(45deg);
+  }
+  .toggle input:checked ~ .toggle-thumb { transform: translateX(20px) rotate(45deg); }
+
+  /* Font size buttons */
+  .font-btns { display: flex; gap: 6px; }
+  .font-btn {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.1em;
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    padding: 4px 10px; cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+  }
+  .font-btn.active { border-color: var(--amber); color: var(--amber); background: rgba(255,140,0,0.08); }
+  .font-btn:hover:not(.active) { border-color: var(--amber-dim); color: var(--text); }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.82); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--panel); border: 1px solid var(--border); border-top: 2px solid var(--amber); padding: 24px; width: 100%; max-width: 660px; max-height: 90vh; overflow-y: auto; position: relative; }
+  .modal h2 { font-family: var(--sans); font-weight: 700; font-size: 1rem; letter-spacing: 0.2em; color: var(--amber); text-transform: uppercase; margin-bottom: 4px; }
+  .modal .modal-sub { font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.08em; margin-bottom: 20px; }
+  .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--text-dim); font-size: 1.2rem; cursor: pointer; line-height: 1; }
+  .modal-close:hover { color: var(--text); }
+
+  .modal-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .modal-field label { font-size: 0.62rem; letter-spacing: 0.12em; color: var(--text-dim); text-transform: uppercase; }
+  .modal-field input, .modal-field select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 0.9rem; padding: 8px 10px; outline: none; -moz-appearance: textfield; -webkit-appearance: none; appearance: none; }
+  .modal-field input::-webkit-inner-spin-button, .modal-field input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .modal-field input:focus, .modal-field select:focus { border-color: var(--amber); }
+  .modal-field select option { background: var(--panel); }
+  .modal-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+  .type-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
+  .type-btn { flex: 1; font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 7px; border: 1px solid var(--border); background: transparent; color: var(--text-dim); cursor: pointer; transition: all 0.15s; }
+  .type-btn.active-mopa { border-color: var(--cyan);   color: var(--cyan);   background: rgba(0,188,212,0.08); }
+  .type-btn.active-qsw  { border-color: var(--purple); color: var(--purple); background: rgba(181,122,255,0.08); }
+
+  .pulse-table { width: 100%; border-collapse: collapse; margin: 8px 0 6px; }
+  .pulse-table th { font-size: 0.6rem; letter-spacing: 0.1em; color: var(--text-dim); text-transform: uppercase; padding: 5px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+  .pulse-table td { padding: 3px 3px; }
+  .pulse-table td input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 0.8rem; padding: 5px 8px; outline: none; -moz-appearance: textfield; }
+  .pulse-table td input::-webkit-inner-spin-button, .pulse-table td input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .pulse-table td input:focus { border-color: var(--amber); }
+  .del-row { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 0.85rem; padding: 4px 8px; }
+  .del-row:hover { color: var(--red); }
+  .th-hint { font-size: 0.5rem; color: var(--text-dim); font-weight: normal; display: block; margin-top: 1px; letter-spacing: 0.05em; text-transform: none; }
+
+  .add-row-btn { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; background: none; border: 1px dashed var(--border); color: var(--text-dim); padding: 5px 12px; cursor: pointer; margin-top: 4px; }
+  .add-row-btn:hover { border-color: var(--amber-dim); color: var(--amber); }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; align-items: center; }
+  .btn { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 8px 18px; border: 1px solid; cursor: pointer; transition: background 0.15s, color 0.15s; }
+  .btn-primary { background: var(--amber); border-color: var(--amber); color: #000; }
+  .btn-primary:hover { background: #ffaa33; }
+  .btn-ghost { background: transparent; border-color: var(--border); color: var(--text-dim); }
+  .btn-ghost:hover { border-color: var(--amber-dim); color: var(--text); }
+  .btn-danger { background: transparent; border-color: rgba(255,51,51,0.4); color: var(--red); margin-left: auto; }
+  .btn-danger:hover { background: rgba(255,51,51,0.1); }
+
+  .modal-error { font-size: 0.65rem; color: var(--red); margin-top: 8px; min-height: 1em; letter-spacing: 0.05em; }
+  .qsw-fields { display: none; }
+  .mopa-fields { display: none; }
+
+  footer {
+    max-width: var(--max-w); margin: 32px auto 0;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    transition: max-width 0.3s;
+  }
+  .footer-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .footer-note { text-align: center; font-size: 0.6rem; color: var(--text-dim); letter-spacing: 0.12em; }
+
+  /* ── Process Parameters unit toggle ── */
+  .unit-toggle { display: flex; gap: 0; margin-bottom: 12px; }
+  .unit-toggle-btn {
+    flex: 1; font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 6px 4px; text-align: center;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-dim); cursor: pointer; transition: all 0.15s;
+    position: relative;
+  }
+  /* Collapse the shared border between buttons */
+  .unit-toggle-btn:last-child { margin-left: -1px; }
+  /* Active state — bring to front so its border renders on top */
+  .unit-toggle-btn.active {
+    background: rgba(255,140,0,0.1);
+    border-color: var(--amber);
+    color: var(--amber);
+    z-index: 1;
+  }
+  .unit-toggle-btn:hover:not(.active) { color: var(--text); border-color: var(--amber-dim); z-index: 1; }
+
+  /* overlap / gap readout color variants */
+  .readout.overlap::after { background: var(--green); }
+  .readout.gap::after     { background: var(--amber); }
+  .readout.overlap .readout-value { color: var(--green); text-shadow: 0 0 12px rgba(0,230,118,0.3); }
+  .readout.gap     .readout-value { color: var(--amber); text-shadow: 0 0 12px rgba(255,140,0,0.3); }
+
+  /* ── Input highlighting on readout hover ── */
+  .input-highlight .input-wrap input,
+  .input-highlight .input-wrap select,
+  .input-highlight .qsw-pulse-display,
+  .input-highlight input[type="number"],
+  .freq-manual.input-highlight input {
+    border-color: var(--cyan) !important;
+    box-shadow: 0 0 0 1px rgba(0,188,212,0.25), inset 0 0 8px rgba(0,188,212,0.06) !important;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  /* Slider section highlight — track turns cyan */
+  .slider-section.input-highlight input[type="range"] {
+    background: linear-gradient(to right, var(--cyan) 0%, var(--cyan) var(--pct, 0%), var(--border) var(--pct, 0%), var(--border) 100%) !important;
+  }
+  .slider-section.input-highlight input[type="range"]::-webkit-slider-thumb {
+    border-color: var(--cyan) !important;
+    box-shadow: 0 0 8px rgba(0,188,212,0.6) !important;
+  }
+  .panel-highlight .panel-title {
+    color: var(--cyan);
+    transition: color 0.15s;
+  }
+  .panel-highlight::before {
+    background: linear-gradient(90deg, var(--cyan), transparent) !important;
+  }
+
+  /* ── Tooltips ── */
+  .readout { position: relative; }
+  .tip-btn {
+    position: absolute; top: 8px; right: 8px;
+    width: 16px; height: 16px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    color: var(--text-faint);
+    font-family: var(--sans);
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .tip-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+  .tooltip {
+    display: none;
+    position: fixed;
+    z-index: 300;
+    max-width: 280px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--amber);
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--text);
+    line-height: 1.6;
+    letter-spacing: 0.03em;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    pointer-events: none;
+  }
+  .tooltip.visible { display: block; }
+  .tip-desc { color: var(--text); margin-bottom: 8px; }
+  .tip-sep { height: 1px; background: var(--border); margin: 6px 0; }
+  .tip-formula { color: var(--text-dim); font-size: 0.58rem; margin-bottom: 6px; letter-spacing: 0.02em; }
+  .tip-formula span { color: var(--cyan); }
+  .tip-live { color: var(--amber); font-size: 0.65rem; font-weight: bold; }
+
+  /* ── Tabs ── */
+  .tab-bar {
+    display: flex; gap: 0; max-width: var(--max-w); margin: 0 auto 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.15em;
+    text-transform: uppercase; padding: 10px 20px;
+    background: transparent; border: none; color: var(--text-dim);
+    cursor: pointer; position: relative; transition: color 0.15s;
+  }
+  .tab-btn::after {
+    content: ''; position: absolute; bottom: -1px; left: 0; right: 0;
+    height: 2px; background: var(--amber); transform: scaleX(0);
+    transition: transform 0.2s;
+  }
+  .tab-btn.active { color: var(--amber); }
+  .tab-btn.active::after { transform: scaleX(1); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  /* Tab content areas */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Converter layout ── */
+  .conv-grid {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    gap: 0; max-width: var(--max-w); margin: 0 auto;
+    align-items: start;
+  }
+  .conv-side { display: flex; flex-direction: column; gap: 14px; }
+  .conv-divider {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 0 16px; gap: 12px;
+    padding-top: 48px;
+  }
+  .swap-btn {
+    font-family: var(--mono); font-size: 1.2rem;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-dim); width: 40px; height: 40px;
+    cursor: pointer; transition: all 0.2s; display: flex;
+    align-items: center; justify-content: center;
+  }
+  .swap-btn:hover { border-color: var(--amber); color: var(--amber); transform: rotate(180deg); }
+
+  .conv-label {
+    font-family: var(--sans); font-weight: 700; font-size: 0.7rem;
+    letter-spacing: 0.25em; text-transform: uppercase; color: var(--amber);
+    margin-bottom: 4px;
+  }
+  .conv-sublabel {
+    font-size: 0.58rem; color: var(--text-faint); letter-spacing: 0.08em;
+  }
+
+  /* Converter panels */
+  .conv-panel {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 16px; position: relative;
+  }
+  .conv-panel::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: linear-gradient(90deg, var(--amber), transparent);
+  }
+  .conv-panel-title {
+    font-family: var(--sans); font-weight: 700; font-size: 0.68rem;
+    letter-spacing: 0.2em; text-transform: uppercase; color: var(--amber);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .conv-panel-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .conv-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .conv-field label { font-size: 0.6rem; letter-spacing: 0.12em; color: var(--text-dim); text-transform: uppercase; }
+  .conv-field .input-wrap input,
+  .conv-field .input-wrap select {
+    font-size: 0.88rem; padding: 7px 44px 7px 10px;
+  }
+
+  /* Solve button */
+  .solve-btn {
+    width: 100%; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.18em;
+    text-transform: uppercase; padding: 12px;
+    background: var(--amber); border: none; color: #000;
+    cursor: pointer; transition: background 0.2s;
+    font-weight: bold;
+  }
+  .solve-btn:hover { background: #ffaa33; }
+  .solve-btn:disabled { background: var(--border); color: var(--text-faint); cursor: not-allowed; }
+
+  /* Locked destination fields */
+  .conv-locked { position: relative; }
+  .conv-locked input {
+    background: rgba(0,0,0,0.2) !important;
+    color: var(--cyan) !important;
+    border-color: rgba(0,188,212,0.3) !important;
+    cursor: default;
+  }
+  .lock-icon {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    font-size: 0.6rem; color: var(--text-faint); pointer-events: none;
+  }
+
+  /* Pulse width override */
+  .pw-override-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .pw-override-row label { font-size: 0.6rem; letter-spacing: 0.1em; color: var(--text-dim); text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .pw-override-row input[type="checkbox"] { accent-color: var(--amber); width: 12px; height: 12px; cursor: pointer; }
+
+  /* Target comparison table */
+  .target-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px; background: var(--border); margin-top: 4px;
+  }
+  .target-grid > div { background: var(--panel2); padding: 8px 10px; }
+  .target-header { font-size: 0.55rem; letter-spacing: 0.12em; color: var(--text-faint); text-transform: uppercase; }
+  .target-val { font-size: 0.82rem; font-family: var(--mono); margin-top: 2px; }
+  .target-val.match-good  { color: var(--green); }
+  .target-val.match-warn  { color: var(--amber); }
+  .target-val.match-fail  { color: var(--red); }
+  .target-val.match-none  { color: var(--text-dim); }
+  .match-badge {
+    display: inline-block; font-size: 0.5rem; padding: 1px 5px;
+    border: 1px solid; margin-left: 4px; vertical-align: middle;
+    letter-spacing: 0.08em;
+  }
+  .match-badge.good { color: var(--green); border-color: rgba(0,230,118,0.4); background: rgba(0,230,118,0.06); }
+  .match-badge.warn { color: var(--amber); border-color: rgba(255,140,0,0.4); background: rgba(255,140,0,0.08); }
+  .match-badge.fail { color: var(--red);   border-color: rgba(255,68,68,0.4); background: rgba(255,68,68,0.06); }
+
+  /* Alt solutions */
+  .alt-solutions { margin-top: 14px; }
+  .alt-banner {
+    padding: 8px 12px; background: rgba(255,140,0,0.06);
+    border: 1px solid rgba(255,140,0,0.3); border-left: 3px solid var(--amber);
+    font-size: 0.62rem; color: var(--amber); letter-spacing: 0.06em; margin-bottom: 10px;
+  }
+  .alt-tabs { display: flex; gap: 0; margin-bottom: 12px; }
+  .alt-tab {
+    flex: 1; font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.1em;
+    text-transform: uppercase; padding: 6px 4px; text-align: center;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-dim); cursor: pointer; transition: all 0.15s;
+    position: relative;
+  }
+  .alt-tab:not(:first-child) { margin-left: -1px; }
+  .alt-tab.active { border-color: var(--amber); color: var(--amber); background: rgba(255,140,0,0.08); z-index: 1; }
+
+  /* From-calculator badge */
+  .from-calc-badge {
+    font-size: 0.55rem; color: var(--cyan); letter-spacing: 0.06em;
+    margin-left: 8px; opacity: 0.8;
+  }
+
+  /* Responsive converter */
+  @media (max-width: 700px) {
+    .conv-grid { grid-template-columns: 1fr; }
+    .conv-divider { flex-direction: row; padding: 8px 0; justify-content: center; }
+  }
+
+  /* Effective power row */
+  .eff-power-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-top: 10px; padding: 8px 10px;
+    background: rgba(0,188,212,0.06); border: 1px solid rgba(0,188,212,0.2);
+    border-left: 3px solid var(--cyan);
+  }
+  .eff-power-label { font-size: 0.58rem; letter-spacing: 0.08em; color: var(--text-dim); text-transform: uppercase; }
+  .eff-power-val   { font-family: var(--mono); font-size: 0.95rem; color: var(--cyan); white-space: nowrap; margin-left: 12px; }
+
+  /* Send to Calculator button */
+  .send-to-calc-btn {
+    width: 100%; margin-top: 12px;
+    font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.15em;
+    text-transform: uppercase; padding: 10px;
+    background: transparent; border: 1px solid var(--cyan);
+    color: var(--cyan); cursor: pointer; transition: all 0.2s;
+  }
+  .send-to-calc-btn:hover { background: rgba(0,188,212,0.1); box-shadow: 0 0 12px rgba(0,188,212,0.2); }
+
+  /* Confidence bar */
+  .conf-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 12px; background: var(--panel2); border: 1px solid var(--border); }
+  .conf-label { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  .conf-bar-wrap { flex: 1; height: 6px; background: var(--border); border-radius: 3px; min-width: 60px; overflow: hidden; }
+  .conf-bar { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+  .conf-pct { font-family: var(--mono); font-size: 1rem; font-weight: bold; white-space: nowrap; min-width: 3.5em; text-align: right; }
+  .conf-note { width: 100%; font-size: 0.58rem; color: var(--text-dim); letter-spacing: 0.06em; margin-top: 2px; }
+
+  /* ── Changelog ── */
+  .changelog-wrap {
+    max-width: var(--max-w); margin: 0 auto;
+    display: flex; flex-direction: column; gap: 0;
+  }
+  .cl-entry {
+    display: grid; grid-template-columns: 160px 1fr;
+    gap: 0; border-bottom: 1px solid var(--border);
+    padding: 20px 0;
+  }
+  .cl-entry:first-child { padding-top: 0; }
+  .cl-version {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--amber); letter-spacing: 0.1em;
+    padding-right: 24px; padding-top: 2px;
+    border-right: 1px solid var(--border);
+    margin-right: 24px;
+  }
+  .cl-items {
+    list-style: none; padding: 0; margin: 0;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .cl-items li {
+    font-size: 0.68rem; color: var(--text-dim);
+    letter-spacing: 0.04em; line-height: 1.6;
+    padding-left: 12px; position: relative;
+  }
+  .cl-items li::before {
+    content: '—'; position: absolute; left: 0;
+    color: var(--text-faint);
+  }
+  .cl-items li strong { color: var(--text); font-weight: normal; }
+
+  @media (max-width: 500px) {
+    .cl-entry { grid-template-columns: 1fr; }
+    .cl-version { border-right: none; border-bottom: 1px solid var(--border); margin-bottom: 10px; padding-bottom: 6px; }
+  }
+
+  /* ── Large screen breakpoints ── */
+  @media (min-width: 1440px) {
+    body:not(.stretch) { --max-w: 1200px; }
+    .grid { grid-template-columns: repeat(3, 1fr); }
+    .panel.full { grid-column: 1 / -1; }
+  }
+  @media (min-width: 2560px) {
+    body:not(.stretch) { --max-w: 1600px; }
+    .readout-value { font-size: 2.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="laser-icon">
+    <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="18" cy="18" r="6" fill="none" stroke="#ff8c00" stroke-width="1.5"/>
+      <circle cx="18" cy="18" r="2.5" fill="#ff8c00"/>
+      <line x1="18" y1="0" x2="18" y2="9" stroke="#ff8c00" stroke-width="1.2" opacity="0.5"/>
+      <line x1="18" y1="27" x2="18" y2="36" stroke="#ff8c00" stroke-width="1.2" opacity="0.5"/>
+      <line x1="0" y1="18" x2="9" y2="18" stroke="#ff8c00" stroke-width="1.2" opacity="0.5"/>
+      <line x1="27" y1="18" x2="36" y2="18" stroke="#ff8c00" stroke-width="1.2" opacity="0.5"/>
+      <line x1="4.4" y1="4.4" x2="11" y2="11" stroke="#ff8c00" stroke-width="1.2" opacity="0.3"/>
+      <line x1="25" y1="25" x2="31.6" y2="31.6" stroke="#ff8c00" stroke-width="1.2" opacity="0.3"/>
+      <line x1="31.6" y1="4.4" x2="25" y2="11" stroke="#ff8c00" stroke-width="1.2" opacity="0.3"/>
+      <line x1="11" y1="25" x2="4.4" y2="31.6" stroke="#ff8c00" stroke-width="1.2" opacity="0.3"/>
+    </svg>
+  </div>
+  <div>
+    <h1>Fiber Laser Power Calculator</h1>
+    <p>PULSE ENERGY · PEAK POWER · BEAM OPTICS · FLUENCE</p>
+    <button class="ds-trigger" id="dsBtn" aria-expanded="false">⚙ Display</button>
+  </div>
+</header>
+
+<!-- DISPLAY SETTINGS POPOVER -->
+<div class="ds-popover" id="dsPopover" aria-hidden="true">
+  <div class="ds-popover-inner">
+    <div class="ds-row">
+      <div>
+        <div class="ds-label">Theme</div>
+        <div class="ds-note">Dark or light background</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="themeToggle">
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+    <div class="ds-row">
+      <div>
+        <div class="ds-label">Stretch to Fit</div>
+        <div class="ds-note">Fill full browser width, scales font</div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="stretchToggle">
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+    <div class="ds-row" style="flex-direction:column; align-items:flex-start; gap:8px">
+      <div>
+        <div class="ds-label">Font Size</div>
+        <div class="ds-note">Scales all text and spacing</div>
+      </div>
+      <div class="font-btns">
+        <button class="font-btn active" id="fontSmall">Small</button>
+        <button class="font-btn" id="fontMed">Medium</button>
+        <button class="font-btn" id="fontLarge">Large</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tabCalc">⚡ Calculator</button>
+  <button class="tab-btn" id="tabConv">⇄ Parameter Converter</button>
+</div>
+
+<!-- CALCULATOR TAB -->
+<div class="tab-content active" id="contentCalc">
+
+<div class="grid">
+
+  <!-- LASER SELECTOR PANEL -->
+  <div class="panel full">
+    <div class="panel-title">Laser Model</div>
+
+    <!-- Brand → Model two-step -->
+    <div class="brand-model-row">
+      <div class="sel-wrap">
+        <select id="brandSelect"></select>
+      </div>
+      <div style="display:flex;gap:6px;align-items:stretch">
+        <div class="sel-wrap" style="flex:1;min-width:0">
+          <select id="modelSelect"></select>
+        </div>
+        <button id="favBtn" title="Favourite this laser" style="flex-shrink:0;background:transparent;border:1px solid var(--border);color:var(--text-faint);font-size:1rem;width:34px;cursor:pointer;transition:color 0.15s,border-color 0.15s;display:flex;align-items:center;justify-content:center;padding:0">☆</button>
+      </div>
+    </div>
+
+    <div class="model-badge" id="modelBadge">&nbsp;</div>
+    <div class="sep"></div>
+
+    <!-- MOPA: pulse width dropdown -->
+    <div id="mopaControls">
+      <div class="input-row" style="margin-bottom:12px">
+        <div class="field">
+          <label>Pulse Width</label>
+          <div class="input-wrap">
+            <select id="pulseSelect"></select>
+            <span class="unit" style="right:12px">ns</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Power %</label>
+          <div class="input-wrap">
+            <input type="number" id="powerPercent" value="100" min="0" max="100" step="1">
+            <span class="unit">%</span>
+          </div>
+        </div>
+      </div>
+      <div class="input-row" style="margin-bottom:0">
+        <div class="field">
+          <label>Cutoff Freq <span style="font-size:0.5rem">(AUTO)</span></label>
+          <div class="input-wrap">
+            <input type="number" id="cutoffFreq" readonly tabindex="-1" style="color:var(--text-dim);cursor:default;border-color:#1e2428">
+            <span class="unit">kHz</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Max Pulse Freq <span style="font-size:0.5rem">(AUTO)</span></label>
+          <div class="input-wrap">
+            <input type="number" id="maxFreq" readonly tabindex="-1" style="color:var(--text-dim);cursor:default;border-color:#1e2428">
+            <span class="unit">kHz</span>
+          </div>
+        </div>
+      </div>
+      <div class="small-note" style="margin-top:8px">
+        Max pulse energy: <span style="color:var(--amber)" id="derivedEnergy">—</span> &nbsp;·&nbsp; E = P_avg ÷ f_cutoff
+      </div>
+    </div>
+
+    <!-- Q-switched: power % only (freq sets everything else) -->
+    <div id="qswControls" style="display:none">
+      <div class="input-row" style="margin-bottom:12px">
+        <div class="field">
+          <label>Power %</label>
+          <div class="input-wrap">
+            <input type="number" id="qswPowerPct" value="100" min="10" max="100" step="1">
+            <span class="unit">%</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Pulse Width <span style="font-size:0.5rem">(@ freq)</span></label>
+          <div class="input-wrap" style="overflow:hidden">
+            <div class="qsw-pulse-display" id="qswPulseDisplay">— ns</div>
+          </div>
+        </div>
+      </div>
+      <div class="input-row" style="margin-bottom:0">
+        <div class="field">
+          <label>Min PRF</label>
+          <div class="input-wrap">
+            <input type="number" id="qswMinFreq" readonly tabindex="-1" style="color:var(--text-dim);cursor:default;border-color:#1e2428">
+            <span class="unit">kHz</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Max PRF</label>
+          <div class="input-wrap">
+            <input type="number" id="qswMaxFreq" readonly tabindex="-1" style="color:var(--text-dim);cursor:default;border-color:#1e2428">
+            <span class="unit">kHz</span>
+          </div>
+        </div>
+      </div>
+      <div class="small-note" style="margin-top:8px">
+        Q-switched: E/pulse = P_avg ÷ f &nbsp;·&nbsp; pulse width interpolated between PRF limits &nbsp;·&nbsp; peak = E ÷ τ
+      </div>
+    </div>
+
+    <button class="add-laser-btn" id="openModalBtn">+ Add Custom Laser</button>
+  </div>
+
+  <!-- FREQUENCY -->
+  <div class="panel" id="panelFreq">
+    <div class="panel-title">Frequency</div>
+    <div class="slider-section">
+      <div class="slider-header">
+        <label>Set Frequency</label>
+        <div class="freq-manual">
+          <input type="number" id="freqManual" value="30" min="1" step="1">
+          <span class="unit">kHz</span>
+        </div>
+      </div>
+      <input type="range" id="freqSlider" min="1" max="4000" value="30" step="1">
+      <div class="tick-row">
+        <span class="tick" id="tickMin">1</span>
+        <span class="tick" id="tickMid">2000</span>
+        <span class="tick" id="tickMax">4000 kHz</span>
+      </div>
+      <div class="small-note" id="freqNote" style="margin-top:10px;min-height:1.4em"></div>
+    </div>
+  </div>
+
+  <!-- BEAM OPTICS -->
+  <div class="panel" id="panelOptics">
+    <div class="panel-title">Beam Optics <span style="font-size:0.58rem;color:var(--text-dim);font-family:var(--mono);margin-left:4px">λ = 1064 nm</span></div>
+    <div class="input-row">
+      <div class="field">
+        <label>Beam Diameter</label>
+        <div class="input-wrap">
+          <input type="number" id="beamDiam" value="7" min="0.1" step="0.1">
+          <span class="unit">mm</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Focal Length</label>
+        <div class="input-wrap">
+          <input type="number" id="focalLen" value="175" min="1" step="1">
+          <span class="unit">mm</span>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Beam Quality M²</label>
+      <div class="input-wrap">
+        <input type="number" id="mSquared" value="1.4" min="1.0" max="4.0" step="0.05">
+        <span class="unit">M²</span>
+      </div>
+    </div>
+    <div class="small-note" style="margin-top:8px">Spec M² &lt;1.5 · 1.0 = diffraction limited</div>
+  </div>
+
+  <!-- PROCESS PARAMETERS -->
+  <div class="panel" id="panelProcess">
+    <div class="panel-title">Process Parameters</div>
+
+    <div class="field" style="margin-bottom:12px">
+      <label>Scan Speed</label>
+      <div class="input-wrap">
+        <input type="number" id="scanSpeed" value="500" min="1" step="1">
+        <span class="unit">mm/s</span>
+      </div>
+    </div>
+
+    <div class="unit-toggle">
+      <button class="unit-toggle-btn active" id="btnLPI">LPI</button>
+      <button class="unit-toggle-btn" id="btnLI">Line Interval</button>
+    </div>
+
+    <div class="field" id="lpiField">
+      <label>Lines Per Inch (LPI)</label>
+      <div class="input-wrap">
+        <input type="number" id="lpiVal" value="254" min="1" step="1">
+        <span class="unit">lpi</span>
+      </div>
+    </div>
+
+    <div class="field" id="liField" style="display:none">
+      <label>Line Interval</label>
+      <div class="input-wrap">
+        <input type="number" id="liVal" value="0.1" min="0.001" step="0.001">
+        <span class="unit">mm</span>
+      </div>
+    </div>
+
+    <div class="small-note" style="margin-top:10px" id="processNote">
+      Requires focused spot diameter from Beam Optics.
+    </div>
+  </div>
+
+  <!-- OUTPUTS -->
+  <div class="panel full">
+    <div class="panel-title">Output Analysis</div>
+    <div class="output-grid">
+      <div class="readout ok" id="readout-watts" data-outputs="watts">
+        <button class="tip-btn" data-tip="watts">?</button>
+        <div class="readout-label">Avg Output Power <span class="clamped-badge" id="badge-watts">CLAMPED</span></div>
+        <div class="readout-value" id="out-watts">—</div>
+        <div class="readout-unit">WATTS</div>
+      </div>
+      <div class="readout info" data-outputs="energy">
+        <button class="tip-btn" data-tip="energy">?</button>
+        <div class="readout-label">Pulse Energy</div>
+        <div class="readout-value" id="out-joules">—</div>
+        <div class="readout-unit" id="out-joules-unit">mJ / pulse</div>
+      </div>
+      <div class="readout info" data-outputs="peak">
+        <button class="tip-btn" data-tip="peak">?</button>
+        <div class="readout-label">Peak Pulse Power</div>
+        <div class="readout-value" id="out-density">—</div>
+        <div class="readout-unit" id="out-density-unit">kW (peak)</div>
+      </div>
+      <div class="readout info" data-outputs="period">
+        <button class="tip-btn" data-tip="period">?</button>
+        <div class="readout-label">Pulse Period</div>
+        <div class="readout-value" id="out-period">—</div>
+        <div class="readout-unit" id="out-period-unit">μs / cycle</div>
+      </div>
+      <div class="readout amber" data-outputs="spot">
+        <button class="tip-btn" data-tip="spot">?</button>
+        <div class="readout-label">Focused Spot Ø</div>
+        <div class="readout-value" id="out-spot">—</div>
+        <div class="readout-unit" id="out-spot-unit">μm</div>
+      </div>
+      <div class="readout amber" data-outputs="fluence">
+        <button class="tip-btn" data-tip="fluence">?</button>
+        <div class="readout-label">Fluence</div>
+        <div class="readout-value" id="out-fluence">—</div>
+        <div class="readout-unit" id="out-fluence-unit">J/cm²</div>
+      </div>
+      <div class="readout info" id="readout-pulseoverlap" data-outputs="pulseoverlap">
+        <button class="tip-btn" data-tip="pulseoverlap">?</button>
+        <div class="readout-label">Pulse Overlap</div>
+        <div class="readout-value" id="out-pulseoverlap">—</div>
+        <div class="readout-unit" id="out-pulseoverlap-unit">%</div>
+      </div>
+      <div class="readout info" id="readout-lineoverlap" data-outputs="lineoverlap">
+        <button class="tip-btn" data-tip="lineoverlap">?</button>
+        <div class="readout-label">Line Overlap</div>
+        <div class="readout-value" id="out-lineoverlap">—</div>
+        <div class="readout-unit" id="out-lineoverlap-unit">%</div>
+      </div>
+    </div>
+    <div class="warning-bar" id="warn-bar">⚠ AVG POWER EXCEEDS RATED OUTPUT — CLAMPED TO <span id="warn-watts">30</span> W</div>
+    <div class="warning-bar" id="warn-pulse">⚠ FREQUENCY EXCEEDS MAX PRF — LIMITED TO <span id="warn-maxfreq">4000</span> kHz</div>
+    <div class="warning-bar" id="warn-minfreq" style="border-left-color:#ffaa33;background:rgba(255,170,51,0.06);border-color:rgba(255,170,51,0.3);">
+      <span style="color:#ffcc66">⚠ FREQUENCY BELOW MIN PRF FOR THIS LASER — MINIMUM IS <span id="warn-minfreq-val">20</span> kHz</span>
+    </div>
+  </div>
+
+</div><!-- end .grid -->
+
+</div><!-- end #contentCalc -->
+
+<!-- CONVERTER TAB -->
+<div class="tab-content" id="contentConv">
+  <div class="conv-grid">
+
+    <!-- SOURCE SIDE -->
+    <div class="conv-side">
+      <div>
+        <div class="conv-label">Source</div>
+        <div class="conv-sublabel">Their laser + settings</div>
+      </div>
+
+      <div class="conv-panel">
+        <div class="conv-panel-title">Laser Model</div>
+        <div class="conv-field">
+          <label>Manufacturer</label>
+          <div class="input-wrap sel-wrap">
+            <select id="srcBrandSelect"></select>
+          </div>
+        </div>
+        <div class="conv-field">
+          <label>Model</label>
+          <div class="input-wrap sel-wrap">
+            <select id="srcModelSelect"></select>
+          </div>
+        </div>
+        <div class="model-badge" id="srcModelBadge" style="margin-top:8px">&nbsp;</div>
+      </div>
+
+      <div class="conv-panel">
+        <div class="conv-panel-title">Optics</div>
+        <div class="conv-field">
+          <label>Focal Length</label>
+          <div class="input-wrap">
+            <input type="number" id="srcFocalLen" value="175" min="1" step="1">
+            <span class="unit">mm</span>
+          </div>
+        </div>
+        <div class="conv-field">
+          <label>Beam Quality M²</label>
+          <div class="input-wrap">
+            <input type="number" id="srcMSquared" value="1.5" min="1.0" max="4.0" step="0.05">
+            <span class="unit">M²</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="conv-panel">
+        <div class="conv-panel-title">Process Settings</div>
+        <div class="input-row">
+          <div class="conv-field">
+            <label>Frequency</label>
+            <div class="input-wrap">
+              <input type="number" id="srcFreq" value="" placeholder="kHz" min="1" step="1">
+              <span class="unit">kHz</span>
+            </div>
+          </div>
+          <div class="conv-field">
+            <label>Power %</label>
+            <div class="input-wrap">
+              <input type="number" id="srcPower" value="" placeholder="%" min="1" max="100" step="1">
+              <span class="unit">%</span>
+            </div>
+          </div>
+        </div>
+        <div class="conv-field" id="srcPulseField">
+          <label>Pulse Width</label>
+          <div class="input-wrap">
+            <select id="srcPulseSelect"></select>
+            <span class="unit" style="right:12px">ns</span>
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="conv-field">
+            <label>Scan Speed</label>
+            <div class="input-wrap">
+              <input type="number" id="srcSpeed" value="" placeholder="mm/s" min="1" step="1">
+              <span class="unit">mm/s</span>
+            </div>
+          </div>
+          <div class="conv-field">
+            <label id="srcLILabel">LPI</label>
+            <div class="input-wrap">
+              <input type="number" id="srcLI" value="" placeholder="lpi" min="0.001" step="0.1">
+              <span class="unit" id="srcLIUnit">lpi</span>
+            </div>
+          </div>
+        </div>
+        <div class="unit-toggle" style="margin-top:4px">
+          <button class="unit-toggle-btn active" id="srcBtnLPI">LPI</button>
+          <button class="unit-toggle-btn" id="srcBtnLI">Line Interval</button>
+        </div>
+      </div>
+
+      <!-- Source targets -->
+      <div class="conv-panel" id="srcTargetsPanel">
+        <div class="conv-panel-title">Calculated Targets</div>
+        <div class="target-grid" id="srcTargetGrid">
+          <div><div class="target-header">Fluence</div><div class="target-val match-none" id="src-fluence">—</div></div>
+          <div><div class="target-header">Pulse Energy</div><div class="target-val match-none" id="src-energy">—</div></div>
+          <div><div class="target-header">Peak Power</div><div class="target-val match-none" id="src-peak">—</div></div>
+          <div><div class="target-header">Pulse Overlap</div><div class="target-val match-none" id="src-poverlap">—</div></div>
+          <div><div class="target-header">Line Overlap</div><div class="target-val match-none" id="src-loverlap">—</div></div>
+          <div><div class="target-header">Spot Ø</div><div class="target-val match-none" id="src-spot">—</div></div>
+        </div>
+        <div class="eff-power-row" id="src-effpower-row" style="display:none">
+          <span class="eff-power-label">Effective avg power at material</span>
+          <span class="eff-power-val" id="src-effpower">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIVIDER + SWAP -->
+    <div class="conv-divider">
+      <button class="swap-btn" id="swapBtn" title="Swap source and destination">⇄</button>
+    </div>
+
+    <!-- DESTINATION SIDE -->
+    <div class="conv-side">
+      <div>
+        <div class="conv-label">Destination <span class="from-calc-badge" id="fromCalcBadge" style="display:none">← from calculator</span></div>
+        <div class="conv-sublabel">Your laser — solver fills settings</div>
+      </div>
+
+      <div class="conv-panel">
+        <div class="conv-panel-title">Laser Model</div>
+        <div class="conv-field">
+          <label>Manufacturer</label>
+          <div class="input-wrap sel-wrap">
+            <select id="dstBrandSelect"></select>
+          </div>
+        </div>
+        <div class="conv-field">
+          <label>Model</label>
+          <div class="input-wrap sel-wrap">
+            <select id="dstModelSelect"></select>
+          </div>
+        </div>
+        <div class="model-badge" id="dstModelBadge" style="margin-top:8px">&nbsp;</div>
+      </div>
+
+      <div class="conv-panel">
+        <div class="conv-panel-title">Optics</div>
+        <div class="conv-field">
+          <label>Focal Length</label>
+          <div class="input-wrap">
+            <input type="number" id="dstFocalLen" value="175" min="1" step="1">
+            <span class="unit">mm</span>
+          </div>
+        </div>
+        <div class="conv-field">
+          <label>Beam Quality M²</label>
+          <div class="input-wrap">
+            <input type="number" id="dstMSquared" value="1.5" min="1.0" max="4.0" step="0.05">
+            <span class="unit">M²</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pulse width override -->
+      <div class="conv-panel">
+        <div class="conv-panel-title">Solver Options</div>
+        <div class="pw-override-row">
+          <label>
+            <input type="checkbox" id="pwOverrideCheck">
+            Override pulse width (MOPA only)
+          </label>
+        </div>
+        <div class="conv-field" id="pwOverrideField" style="display:none">
+          <label>Pulse Width</label>
+          <div class="input-wrap">
+            <select id="dstPulseOverride"></select>
+            <span class="unit" style="right:12px">ns</span>
+          </div>
+        </div>
+        <button class="solve-btn" id="solveBtn" disabled>⚡ Solve</button>
+      </div>
+
+      <!-- Destination solved settings -->
+      <div class="conv-panel" id="dstResultPanel" style="display:none">
+        <div class="conv-panel-title">Solved Settings</div>
+        <div class="input-row">
+          <div class="conv-field">
+            <label>Frequency</label>
+            <div class="input-wrap conv-locked">
+              <input type="number" id="dst-freq" readonly>
+              <span class="unit">kHz</span>
+              <span class="lock-icon">⇄</span>
+            </div>
+          </div>
+          <div class="conv-field">
+            <label>Power %</label>
+            <div class="input-wrap conv-locked">
+              <input type="number" id="dst-power" readonly>
+              <span class="unit">%</span>
+              <span class="lock-icon">⇄</span>
+            </div>
+          </div>
+        </div>
+        <div class="conv-field" id="dstPulseRow">
+          <label>Pulse Width</label>
+          <div class="input-wrap conv-locked">
+            <input type="number" id="dst-pulse" readonly>
+            <span class="unit">ns</span>
+            <span class="lock-icon">⇄</span>
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="conv-field">
+            <label>Scan Speed</label>
+            <div class="input-wrap conv-locked">
+              <input type="number" id="dst-speed" readonly>
+              <span class="unit">mm/s</span>
+              <span class="lock-icon">⇄</span>
+            </div>
+          </div>
+          <div class="conv-field">
+            <label id="dstLILabel">LPI</label>
+            <div class="input-wrap conv-locked">
+              <input type="number" id="dst-li" readonly>
+              <span class="unit" id="dstLIUnit">lpi</span>
+              <span class="lock-icon">⇄</span>
+            </div>
+          </div>
+        </div>
+        <div class="eff-power-row" id="dst-effpower-row" style="display:none">
+          <span class="eff-power-label">Effective avg power at material</span>
+          <span class="eff-power-val" id="dst-effpower">—</span>
+        </div>
+        <button class="send-to-calc-btn" id="sendToCalcBtn">
+          ⚡ Send to Calculator →
+        </button>
+      </div>
+
+      <!-- Results comparison -->
+      <div class="conv-panel" id="dstMatchPanel" style="display:none">
+        <div class="conv-panel-title">Match Results</div>
+        <div class="target-grid">
+          <div style="background:var(--panel);padding:5px 8px;font-size:0.55rem;letter-spacing:0.1em;color:var(--text-faint);text-transform:uppercase"></div>
+          <div style="background:var(--panel);padding:5px 8px;font-size:0.55rem;letter-spacing:0.1em;color:var(--text-faint);text-transform:uppercase">Target</div>
+          <div style="background:var(--panel);padding:5px 8px;font-size:0.55rem;letter-spacing:0.1em;color:var(--text-faint);text-transform:uppercase">Result</div>
+          <!-- rows filled by JS -->
+        </div>
+        <div id="matchRowsContainer" style="margin-top:1px"></div>
+
+        <!-- Alt solutions -->
+        <div class="alt-solutions" id="altSolutionsDiv" style="display:none">
+          <div class="alt-banner">⚠ EXACT MATCH NOT POSSIBLE — SHOWING 3 CLOSEST ALTERNATIVES</div>
+          <div class="alt-tabs">
+            <button class="alt-tab active" id="altTab0" onclick="showAlt(0)">Fluence Priority</button>
+            <button class="alt-tab" id="altTab1" onclick="showAlt(1)">Overlap Priority</button>
+            <button class="alt-tab" id="altTab2" onclick="showAlt(2)">Balanced</button>
+          </div>
+          <div id="altContent"></div>
+        </div>
+      </div>
+
+    </div><!-- end dst -->
+  </div><!-- end conv-grid -->
+</div><!-- end #contentConv -->
+
+<!-- CHANGELOG MODAL -->
+<div class="modal-overlay" id="changelogOverlay">
+  <div class="modal" style="max-width:720px">
+    <button class="modal-close" id="closeChangelogBtn">✕</button>
+    <h2>Changelog</h2>
+    <p class="modal-sub">Full version history — what changed and when.</p>
+    <div class="changelog-wrap">
+
+    <div class="cl-entry">
+      <div class="cl-version">v5.10</div>
+      <ul class="cl-items">
+        <li>Clarified below-cutoff MOPA physics — E/pulse and peak power are constant below cutoff while avg power scales linearly with frequency; this is correct MOPA behaviour, not a bug</li>
+        <li>Improved freq note and Avg Power, Pulse Energy, and Peak Power tooltips to explain this explicitly</li>
+        <li>Removed duplicate entries for YDFLP-E-80-M7-M-R and YDFLP-E-100-M7-M-R which had been added twice under different IDs with identical pulse tables</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v5.9</div>
+      <ul class="cl-items">
+        <li>Added <strong>★ Favourites</strong> system — star any laser in the calculator to pin it to a Favourites group at the top of the brand dropdown; persists across sessions</li>
+        <li>Added <strong>last used</strong> persistence — calculator remembers your selected laser and restores it on next load</li>
+        <li>Fixed unfavourite bug — removing last favourite now correctly drops back to the laser's real brand; removing from Favourites view with others remaining stays in Favourites</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v5.8</div>
+      <ul class="cl-items">
+        <li>Major laser database expansion — <strong>53 total models</strong> across JPT, Raycus, and Max Photonics</li>
+        <li>JPT: added E-LP, M6+, M7, M7-S, M8, C-M7, and L1 series across 20–200W (17 new MOPA models)</li>
+        <li>Raycus: added full MX MOPA series (P20MX–P200MX, P200S) and expanded Q-switched lineup (P20QB, P20QS, P30QB, P30QS, P50QB, P60QB, P70Q, P70QA, P100Q, P100QA)</li>
+        <li>Max Photonics: added MFP-10W, MFP-30W, MFP-50W, MFP-100W, MFP-200W; renamed MFP-50W/X → MFP-50X</li>
+        <li>Corrected tauMin for RFL-P30Q (90→120 ns) and RFL-P50QB (90→120 ns) based on spec sheet verification</li>
+        <li>All models sorted by wattage ascending within each brand</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v5.7</div>
+      <ul class="cl-items">
+        <li>Added <strong>📋 Changelog</strong> as an in-app modal — version history is now embedded in the HTML file itself, accessible from the footer next to the version badge</li>
+        <li>Removed Changelog as a separate tab — stays on whichever tab you're already using</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v5.6</div>
+      <ul class="cl-items">
+        <li>Added <strong>Effective Avg Power at Material</strong> row to both Source and Destination panels in the Converter — shows actual watts at the material (pulse energy × frequency) so users can understand why power% values differ between lasers while delivering equivalent energy</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v5.5</div>
+      <ul class="cl-items">
+        <li>Added <strong>⚡ Send to Calculator →</strong> button at the bottom of Solved Settings — transfers all destination parameters to the Calculator tab and switches to it, so users can fine-tune from the solved result</li>
+        <li>Header briefly flashes cyan on transfer as visual confirmation</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v5.4</div>
+      <ul class="cl-items">
+        <li>Solver now penalizes <strong>pulse width deviation</strong> for MOPA→MOPA conversions — strongly prefers matching source pulse width rather than finding mathematically equivalent solutions at different pulse widths</li>
+        <li>Pulse width penalty weight is source-type aware: applied for MOPA→MOPA, zero for Q-SW→MOPA</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v5.3</div>
+      <ul class="cl-items">
+        <li>Added <strong>Match Confidence score</strong> (0–100%) to Match Results — color-coded progress bar with plain English label</li>
+        <li>Green ≥80%, Amber ≥50%, Red &lt;50%. Uses exponential decay: confidence = 100 × e^(−score × 2)</li>
+        <li>Shown on all three alternative solution tabs</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v5.2</div>
+      <ul class="cl-items">
+        <li>Added <strong>frequency proximity penalty</strong> to solver — prevents returning technically correct but practically useless solutions at wildly different frequencies</li>
+        <li>Added low scan speed penalty (below 10 mm/s is flagged as suspicious)</li>
+        <li>Fixed solver returning 1 kHz / 20% on 60W when correct answer was 80 kHz / 33.3%</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v5.1</div>
+      <ul class="cl-items">
+        <li>Pulse width priority is now <strong>source-type aware</strong> — MOPA→MOPA starts at source pulse width and radiates outward; Q-SW→MOPA uses 200ns → 100ns priority</li>
+        <li>Three alternative solutions now use genuinely different scoring weights (Fluence Priority, Overlap Priority, Balanced)</li>
+        <li>Added <strong>power pre-check warning</strong> when destination rated power is below source effective power</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v5.0 — Parameter Converter</div>
+      <ul class="cl-items">
+        <li>Added <strong>⇄ Parameter Converter</strong> tab — converts a known working parameter set from one laser source to an equivalent set for a different laser</li>
+        <li>Source side: full parameter entry (laser, optics, frequency, power%, pulse width, speed, LPI/LI). Calculated Targets update live</li>
+        <li>Destination side: laser + optics only. Solver finds frequency, power%, pulse width, speed, and line interval to match source targets</li>
+        <li>Destination auto-populates from active Calculator selection on tab switch</li>
+        <li>⇄ Swap button flips all values between source and destination</li>
+        <li>Exact match shown as single result; no exact match auto-generates 3 alternatives</li>
+        <li>Match table with ✓/⚠/✗ badges for Fluence, Pulse Energy, Pulse Overlap, Line Overlap, Peak Power</li>
+        <li>Optional pulse width override for MOPA destination lasers</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v4.15</div>
+      <ul class="cl-items">
+        <li>LPI/Line Interval toggle now <strong>converts the value</strong> when switching modes</li>
+        <li>Guard added so clicking the already-active toggle does nothing</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v4.14</div>
+      <ul class="cl-items">
+        <li>Added rule of thumb to Pulse Overlap tooltip: "60–80% overlap is common for marking; deeper engraving often higher"</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v4.13</div>
+      <ul class="cl-items">
+        <li>Fixed LPI/Line Interval toggle button border — active state now always shows a complete box outline</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v4.12</div>
+      <ul class="cl-items">
+        <li>Added <strong>Process Parameters panel</strong> — Scan Speed, LPI/Line Interval toggle with auto-conversion</li>
+        <li>Added <strong>Pulse Overlap</strong> and <strong>Line Overlap</strong> output readouts — green for overlap, amber for gap, label switches between "% overlap" and "% gap"</li>
+        <li>Both new readouts wired into highlighting and tooltip system</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v4.11</div>
+      <ul class="cl-items">
+        <li>Added <strong>live formula + values to all tooltips</strong> — three sections: description, symbolic formula (cyan), live calculated values (amber)</li>
+        <li>Fixed Avg Output Power tooltip to show full formula breakdown</li>
+        <li>Removed leading = from live value lines</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v4.9 – v4.10</div>
+      <ul class="cl-items">
+        <li>Fixed input highlighting CSS — slider track, freq manual input, and panel title now correctly highlight in cyan on readout hover</li>
+        <li>Added LIVE state object to calculate() so tooltip live values always reflect current inputs</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v4.8</div>
+      <ul class="cl-items">
+        <li>Added <strong>input highlighting on output readout hover</strong> — hovering any output highlights its contributing inputs in cyan</li>
+        <li>Highlighting is laser-type aware (MOPA-only and Q-SW-only fields handled separately)</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v4.5</div>
+      <ul class="cl-items">
+        <li>Added <strong>? tooltip buttons</strong> to all Output Analysis readouts</li>
+        <li>Tooltips follow the mouse on desktop, tap-toggle on mobile</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v4.4</div>
+      <ul class="cl-items">
+        <li>Display Settings moved to a <strong>⚙ Display popover</strong> in the header</li>
+        <li>Slider redesigned — rounded track with amber fill, circular thumb with glow on hover</li>
+        <li>Font sizes revised: Small=15px (default), Medium=18px, Large=22px</li>
+        <li>Stretch to Fit also scales font size. All display settings persist to localStorage</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v4.3</div>
+      <ul class="cl-items">
+        <li>Added Display Settings: Dark/Light mode, Stretch to Fit, Font Size</li>
+        <li>Light mode uses darker burnt-orange accent. Improved text contrast across the board</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v4.0 – v4.2</div>
+      <ul class="cl-items">
+        <li>Added Export Example DB button</li>
+        <li>Moved Export/Import DB and version to footer. Fixed mobile horizontal scroll</li>
+        <li>Fluid font scaling for 4K screens</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v3.7 – v3.9</div>
+      <ul class="cl-items">
+        <li>Reordered JPT database: sorted by wattage, E2 before E within each wattage</li>
+        <li>Added wattage dividers and field documentation to all brand sections</li>
+        <li>Added commented-out Custom laser section with MOPA and Q-switched examples</li>
+        <li>Filename now includes version number</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-version">v3.6 and earlier — Initial Build</div>
+      <ul class="cl-items">
+        <li>MOPA and Q-switched physics models (cutoff frequency, pulse energy, peak power, fluence, spot size)</li>
+        <li>JPT, Raycus, and Max Photonics laser database</li>
+        <li>Frequency slider with live cutoff/max PRF display</li>
+        <li>Beam optics panel (beam diameter, focal length, M²)</li>
+        <li>Output Analysis panel with 6 readouts</li>
+        <li>Custom laser modal with localStorage persistence</li>
+        <li>Export / Import DB (JSON)</li>
+        <li>Dark industrial theme (amber/black, Share Tech Mono + Rajdhani)</li>
+      </ul>
+    </div>
+
+    </div><!-- end changelog-wrap -->
+  </div><!-- end modal -->
+</div><!-- end changelogOverlay -->
+
+<footer>
+  <div class="footer-tools">
+    <button class="db-btn" id="exportBtn">Export DB</button>
+    <button class="db-btn" id="importBtn">Import DB</button>
+    <button class="db-btn" id="exportExampleBtn">Export Example DB</button>
+    <input type="file" id="importFileInput" accept=".json" style="display:none">
+    <span class="version">v5.10</span>
+    <button class="db-btn" id="changelogBtn">📋 Changelog</button>
+  </div>
+  <div class="footer-note">FIBER LASER POWER CALCULATOR &nbsp;|&nbsp; MOPA: W = Hz × J (below cutoff) &nbsp;|&nbsp; Q-SW: E = P ÷ f, τ interpolated &nbsp;|&nbsp; THEORETICAL — VERIFY WITH HARDWARE</div>
+</footer>
+
+<!-- TOOLTIP -->
+<div class="tooltip" id="tooltip"></div>
+
+<!-- CUSTOM LASER MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <button class="modal-close" id="closeModalBtn">✕</button>
+    <h2 id="modalTitle">Add Custom Laser</h2>
+    <p class="modal-sub">Saved to browser localStorage — persists between sessions.</p>
+
+    <!-- Laser type toggle -->
+    <div class="type-toggle">
+      <button class="type-btn active-mopa" id="typeMopa" onclick="setModalType('mopa')">MOPA</button>
+      <button class="type-btn" id="typeQsw"  onclick="setModalType('qsw')">Q-Switched</button>
+    </div>
+
+    <div class="modal-2col">
+      <div class="modal-field">
+        <label>Model Name</label>
+        <input type="text" id="customName" placeholder="e.g. JPT MOPA M6-60W">
+      </div>
+      <div class="modal-2col" style="gap:8px">
+        <div class="modal-field">
+          <label>Power (W)</label>
+          <input type="number" id="customWatts" value="30" min="1" step="1">
+        </div>
+        <div class="modal-field">
+          <label>Beam Ø (mm)</label>
+          <input type="number" id="customBeam" value="7" min="0.1" step="0.1">
+        </div>
+      </div>
+    </div>
+
+    <!-- MOPA fields: pulse width / cutoff / max freq table -->
+    <div class="mopa-fields" id="mopaModalFields">
+      <label style="font-size:0.62rem;letter-spacing:0.12em;color:var(--text-dim);text-transform:uppercase;display:block;margin:10px 0 6px">Pulse Width → Cutoff → Max Freq Table</label>
+      <table class="pulse-table">
+        <thead><tr>
+          <th>Pulse Width (ns)</th>
+          <th>Cutoff Freq (kHz)<span class="th-hint">P_avg ÷ E_pulse</span></th>
+          <th>Max Pulse Freq (kHz)</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="pulseTableBody"></tbody>
+      </table>
+      <button class="add-row-btn" id="addRowBtn">+ Add Row</button>
+    </div>
+
+    <!-- Q-switched fields: PRF range + pulse width range -->
+    <div class="qsw-fields" id="qswModalFields">
+      <label style="font-size:0.62rem;letter-spacing:0.12em;color:var(--text-dim);text-transform:uppercase;display:block;margin:10px 0 8px">PRF &amp; Pulse Width Limits</label>
+      <div class="modal-3col">
+        <div class="modal-field">
+          <label>Min PRF (kHz)</label>
+          <input type="number" id="qswModalMinFreq" value="20" min="1" step="1">
+        </div>
+        <div class="modal-field">
+          <label>Max PRF (kHz)</label>
+          <input type="number" id="qswModalMaxFreq" value="60" min="1" step="1">
+        </div>
+        <div class="modal-field">
+          <label>Max Pulse Energy (mJ)</label>
+          <input type="number" id="qswModalMaxPulseEn" placeholder="e.g. 1.0" min="0" step="0.01">
+        </div>
+      </div>
+      <div class="modal-2col">
+        <div class="modal-field">
+          <label>Pulse Width @ Min PRF (ns)</label>
+          <input type="number" id="qswModalTauMin" value="80" min="1" step="1" placeholder="ns at min freq">
+        </div>
+        <div class="modal-field">
+          <label>Pulse Width @ Max PRF (ns)</label>
+          <input type="number" id="qswModalTauMax" value="130" min="1" step="1" placeholder="ns at max freq">
+        </div>
+      </div>
+      <div class="small-note" style="margin-top:4px">Pulse width is linearly interpolated between these two anchor points at any frequency.</div>
+
+      <!-- Optional: power varies with frequency (e.g. MFP-30X) -->
+      <label style="font-size:0.62rem;letter-spacing:0.12em;color:var(--text-dim);text-transform:uppercase;display:block;margin:14px 0 6px">
+        Power Varies With Frequency? <span style="color:var(--text-dim);font-size:0.55rem;text-transform:none">(optional — leave blank if rated power is constant)</span>
+      </label>
+      <div class="modal-2col">
+        <div class="modal-field">
+          <label>Rated Power @ Anchor Freq A (W)</label>
+          <input type="number" id="qswModalWattsA" placeholder="e.g. 25" min="0" step="0.1">
+        </div>
+        <div class="modal-field">
+          <label>Anchor Freq A (kHz)</label>
+          <input type="number" id="qswModalFreqA" placeholder="e.g. 30" min="1" step="1">
+        </div>
+      </div>
+      <div class="modal-2col">
+        <div class="modal-field">
+          <label>Rated Power @ Anchor Freq B (W)</label>
+          <input type="number" id="qswModalWattsB" placeholder="e.g. 30" min="0" step="0.1">
+        </div>
+        <div class="modal-field">
+          <label>Anchor Freq B (kHz)</label>
+          <input type="number" id="qswModalFreqB" placeholder="e.g. 40" min="1" step="1">
+        </div>
+      </div>
+      <div class="small-note" style="margin-top:4px">If filled, rated output power will be linearly interpolated between these two frequency anchor points.</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="saveCustomBtn">Save Laser</button>
+      <button class="btn btn-ghost"   id="cancelModalBtn">Cancel</button>
+      <button class="btn btn-danger"  id="deleteCustomBtn" style="display:none">Delete Laser</button>
+    </div>
+    <div class="modal-error" id="modalError"></div>
+  </div>
+</div>
+
+<script>
+const LAMBDA_M = 1064e-9;
+
+// ═══════════════════════════════════════════════════════════════
+//  LASER DATABASE
+// ═══════════════════════════════════════════════════════════════
+
+const BUILTIN_LASERS = [
+
+  // ══ JPT ══════════════════════════════════════════════
+
+  {
+    id: 'jpt-m8-20', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-20-M8',
+    watts: 20, beamDiam: 7.5, mSquared: 1.4,
+    maxPulseEnMJ: 1.1,
+    pulses: [
+      { ns:    1, cutoff:   500, maxFreq:  4000 },
+      { ns:    2, cutoff:   240, maxFreq:  4000 },
+      { ns:    4, cutoff:   160, maxFreq:  4000 },
+      { ns:    6, cutoff:   120, maxFreq:  4000 },
+      { ns:    9, cutoff:    85, maxFreq:  4000 },
+      { ns:   13, cutoff:    65, maxFreq:  3000 },
+      { ns:   20, cutoff:    50, maxFreq:  3000 },
+      { ns:   30, cutoff:    46, maxFreq:  3000 },
+      { ns:   45, cutoff:    42, maxFreq:  2000 },
+      { ns:   60, cutoff:    38, maxFreq:  2000 },
+      { ns:   80, cutoff:    36, maxFreq:  2000 },
+      { ns:  100, cutoff:    34, maxFreq:  1000 },
+      { ns:  150, cutoff:    24, maxFreq:  1000 },
+      { ns:  200, cutoff:    20, maxFreq:  1000 },
+      { ns:  250, cutoff:    18, maxFreq:   900 },
+      { ns:  350, cutoff:    18, maxFreq:   600 },
+    ]
+  },
+
+  {
+    id: 'jpt-e-20-lp', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-E-20-LP',
+    watts: 20, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 0.8,
+    pulses: [
+      { ns:  200, cutoff:    25, maxFreq:   600 },
+    ]
+  },
+
+  {
+    id: 'jpt-e-m7-20', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-E-20-M7-S-R',
+    watts: 20, beamDiam: 7.0, mSquared: 1.4,
+    maxPulseEnMJ: 0.8,
+    pulses: [
+      { ns:    2, cutoff:   850, maxFreq:  4000 },
+      { ns:    4, cutoff:   500, maxFreq:  4000 },
+      { ns:    6, cutoff:   320, maxFreq:  4000 },
+      { ns:    9, cutoff:   250, maxFreq:  4000 },
+      { ns:   13, cutoff:   170, maxFreq:  3000 },
+      { ns:   20, cutoff:   115, maxFreq:  3000 },
+      { ns:   30, cutoff:    90, maxFreq:  3000 },
+      { ns:   45, cutoff:    75, maxFreq:  2000 },
+      { ns:   60, cutoff:    65, maxFreq:  2000 },
+      { ns:   80, cutoff:    60, maxFreq:  2000 },
+      { ns:  100, cutoff:    55, maxFreq:  1000 },
+      { ns:  150, cutoff:    30, maxFreq:  1000 },
+      { ns:  200, cutoff:    25, maxFreq:  1000 },
+      { ns:  250, cutoff:    25, maxFreq:   900 },
+      { ns:  350, cutoff:    25, maxFreq:   600 },
+      { ns:  500, cutoff:    25, maxFreq:   500 },
+    ]
+  },
+
+  {
+    id: 'jpt-m6-20', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP‐20‐M6+‐S',
+    watts: 20, beamDiam: 7.0, mSquared: 1.3,
+    maxPulseEnMJ: 0.5,
+    pulses: [
+      { ns:    1, cutoff:  1600, maxFreq:  2000 },
+      { ns:    2, cutoff:   850, maxFreq:  2000 },
+      { ns:    4, cutoff:   500, maxFreq:  2000 },
+      { ns:    6, cutoff:   320, maxFreq:  2000 },
+      { ns:    9, cutoff:   250, maxFreq:  2000 },
+      { ns:   13, cutoff:   170, maxFreq:  2000 },
+      { ns:   20, cutoff:   115, maxFreq:  2000 },
+      { ns:   30, cutoff:    90, maxFreq:  2000 },
+      { ns:   45, cutoff:    75, maxFreq:  2000 },
+      { ns:   55, cutoff:    65, maxFreq:  2000 },
+      { ns:   60, cutoff:    65, maxFreq:  2000 },
+      { ns:   80, cutoff:    60, maxFreq:  2000 },
+      { ns:  100, cutoff:    55, maxFreq:  2000 },
+      { ns:  150, cutoff:    45, maxFreq:  2000 },
+      { ns:  200, cutoff:    45, maxFreq:  2000 },
+      { ns:  250, cutoff:    40, maxFreq:  2000 },
+    ]
+  },
+
+  {
+    id: 'jpt-e-30-lp', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-E-30-LP',
+    watts: 30, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 0.8,
+    pulses: [
+      { ns:  200, cutoff:    37, maxFreq:   600 },
+    ]
+  },
+
+  {
+    id: 'jpt-e-30', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-E-30-M7-M-R',
+    watts: 30, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 1.0,
+    pulses: [
+      { ns:   20, cutoff:   450, maxFreq:  4000 },
+      { ns:  100, cutoff:    53, maxFreq:  1000 },
+      { ns:  200, cutoff:    24, maxFreq:  1000 },
+      { ns:  500, cutoff:    15, maxFreq:   500 },
+    ]
+  },
+
+  {
+    id: 'jpt-e-m7-30', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-E-30-M7-S-R',
+    watts: 30, beamDiam: 7.0, mSquared: 1.4,
+    maxPulseEnMJ: 0.8,
+    pulses: [
+      { ns:    2, cutoff:  1300, maxFreq:  4000 },
+      { ns:    4, cutoff:   750, maxFreq:  4000 },
+      { ns:    6, cutoff:   480, maxFreq:  4000 },
+      { ns:    9, cutoff:   375, maxFreq:  4000 },
+      { ns:   13, cutoff:   250, maxFreq:  3000 },
+      { ns:   20, cutoff:   170, maxFreq:  3000 },
+      { ns:   30, cutoff:   135, maxFreq:  3000 },
+      { ns:   45, cutoff:   110, maxFreq:  2000 },
+      { ns:   60, cutoff:   100, maxFreq:  2000 },
+      { ns:   80, cutoff:    90, maxFreq:  2000 },
+      { ns:  100, cutoff:    80, maxFreq:  1000 },
+      { ns:  150, cutoff:    45, maxFreq:  1000 },
+      { ns:  200, cutoff:    37, maxFreq:  1000 },
+      { ns:  250, cutoff:    37, maxFreq:   900 },
+      { ns:  350, cutoff:    37, maxFreq:   600 },
+      { ns:  500, cutoff:    37, maxFreq:   500 },
+    ]
+  },
+
+  {
+    id: 'jpt-c-m7-20', brand: 'JPT', type: 'mopa',
+    name: 'YDFLPC-30-M7-S',
+    watts: 30, beamDiam: 7.0, mSquared: 1.3,
+    maxPulseEnMJ: 0.8,
+    pulses: [
+      { ns:    2, cutoff:  1300, maxFreq:  4000 },
+      { ns:    4, cutoff:   750, maxFreq:  4000 },
+      { ns:    6, cutoff:   480, maxFreq:  4000 },
+      { ns:    8, cutoff:   375, maxFreq:  4000 },
+      { ns:   13, cutoff:   250, maxFreq:  4000 },
+      { ns:   20, cutoff:   170, maxFreq:  4000 },
+      { ns:   30, cutoff:   135, maxFreq:  4000 },
+      { ns:   45, cutoff:   110, maxFreq:  4000 },
+      { ns:   60, cutoff:   100, maxFreq:  4000 },
+      { ns:   80, cutoff:    90, maxFreq:  4000 },
+      { ns:  100, cutoff:    80, maxFreq:  4000 },
+      { ns:  150, cutoff:    45, maxFreq:  4000 },
+      { ns:  200, cutoff:    37, maxFreq:  4000 },
+      { ns:  250, cutoff:    37, maxFreq:  4000 },
+      { ns:  350, cutoff:    37, maxFreq:  4000 },
+    ]
+  },
+
+  {
+    id: 'jpt-e-50-lp', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-E-50-LP',
+    watts: 50, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 1.25,
+    pulses: [
+      { ns:  200, cutoff:    40, maxFreq:   600 },
+    ]
+  },
+
+  {
+    id: 'jpt-m7-60', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-60-M7-M-R',
+    watts: 60, beamDiam: 7.0, mSquared: 1.4,
+    maxPulseEnMJ: 2.0,
+    pulses: [
+      { ns:    2, cutoff:  1950, maxFreq:  4000 },
+      { ns:    4, cutoff:  1350, maxFreq:  4000 },
+      { ns:    6, cutoff:   975, maxFreq:  4000 },
+      { ns:    9, cutoff:   600, maxFreq:  4000 },
+      { ns:   13, cutoff:   412, maxFreq:  3000 },
+      { ns:   20, cutoff:   225, maxFreq:  3000 },
+      { ns:   30, cutoff:   187, maxFreq:  3000 },
+      { ns:   45, cutoff:   150, maxFreq:  2000 },
+      { ns:   60, cutoff:   135, maxFreq:  2000 },
+      { ns:   80, cutoff:   112, maxFreq:  2000 },
+      { ns:  100, cutoff:   105, maxFreq:  1000 },
+      { ns:  150, cutoff:    57, maxFreq:  1000 },
+      { ns:  200, cutoff:    45, maxFreq:  1000 },
+      { ns:  250, cutoff:    42, maxFreq:   900 },
+      { ns:  350, cutoff:    40, maxFreq:   600 },
+      { ns:  500, cutoff:    30, maxFreq:   500 },
+    ]
+  },
+
+  {
+    id: 'jpt-e-60', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-E-60-M7-M-R',
+    watts: 60, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 1.5,
+    pulses: [
+      { ns:    2, cutoff:  1950, maxFreq:  4000 },
+      { ns:    4, cutoff:  1350, maxFreq:  4000 },
+      { ns:    6, cutoff:   975, maxFreq:  4000 },
+      { ns:    9, cutoff:   600, maxFreq:  4000 },
+      { ns:   13, cutoff:   412, maxFreq:  3000 },
+      { ns:   20, cutoff:   225, maxFreq:  3000 },
+      { ns:   30, cutoff:   187, maxFreq:  3000 },
+      { ns:   45, cutoff:   150, maxFreq:  2000 },
+      { ns:   60, cutoff:   135, maxFreq:  2000 },
+      { ns:   80, cutoff:   112, maxFreq:  2000 },
+      { ns:  100, cutoff:   105, maxFreq:  1000 },
+      { ns:  150, cutoff:    57, maxFreq:  1000 },
+      { ns:  200, cutoff:    45, maxFreq:  1000 },
+      { ns:  250, cutoff:    42, maxFreq:   900 },
+      { ns:  350, cutoff:    40, maxFreq:   600 },
+      { ns:  500, cutoff:    30, maxFreq:   500 },
+    ]
+  },
+
+  {
+    id: 'jpt-e2-60', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-E2-60-M7-M-R',
+    watts: 60, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 2.0,
+    pulses: [
+      { ns:    2, cutoff:  1950, maxFreq:  4000 },
+      { ns:    4, cutoff:  1350, maxFreq:  4000 },
+      { ns:    6, cutoff:   975, maxFreq:  4000 },
+      { ns:    9, cutoff:   600, maxFreq:  4000 },
+      { ns:   13, cutoff:   412, maxFreq:  3000 },
+      { ns:   20, cutoff:   252, maxFreq:  3000 },
+      { ns:   30, cutoff:   187, maxFreq:  3000 },
+      { ns:   45, cutoff:   150, maxFreq:  2000 },
+      { ns:   60, cutoff:   135, maxFreq:  2000 },
+      { ns:   80, cutoff:   112, maxFreq:  2000 },
+      { ns:  100, cutoff:   105, maxFreq:  1000 },
+      { ns:  150, cutoff:    57, maxFreq:  1000 },
+      { ns:  200, cutoff:    48, maxFreq:  1000 },
+      { ns:  250, cutoff:    46, maxFreq:   900 },
+      { ns:  350, cutoff:    40, maxFreq:   600 },
+      { ns:  500, cutoff:    30, maxFreq:   500 },
+    ]
+  },
+
+  {
+    id: 'jpt-m7-80', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-80-M7-M-R',
+    watts: 80, beamDiam: 7.0, mSquared: 1.4,
+    maxPulseEnMJ: 2.0,
+    pulses: [
+      { ns:    2, cutoff:  2600, maxFreq:  4000 },
+      { ns:    4, cutoff:  1800, maxFreq:  4000 },
+      { ns:    6, cutoff:  1300, maxFreq:  4000 },
+      { ns:    9, cutoff:   800, maxFreq:  4000 },
+      { ns:   13, cutoff:   550, maxFreq:  3000 },
+      { ns:   20, cutoff:   300, maxFreq:  3000 },
+      { ns:   30, cutoff:   250, maxFreq:  3000 },
+      { ns:   45, cutoff:   200, maxFreq:  2000 },
+      { ns:   60, cutoff:   180, maxFreq:  2000 },
+      { ns:   80, cutoff:   150, maxFreq:  2000 },
+      { ns:  100, cutoff:   140, maxFreq:  1000 },
+      { ns:  150, cutoff:    76, maxFreq:  1000 },
+      { ns:  200, cutoff:    60, maxFreq:  1000 },
+      { ns:  250, cutoff:    56, maxFreq:   900 },
+      { ns:  350, cutoff:    53, maxFreq:   600 },
+      { ns:  500, cutoff:    40, maxFreq:   500 },
+    ]
+  },
+
+  {
+    id: 'jpt-e-80', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-E-80-M7-M-R',
+    watts: 80, beamDiam: 7.0, mSquared: 1.6,
+    pulses: [
+      { ns:    2, cutoff:  2600, maxFreq:  4000 },
+      { ns:    4, cutoff:  1800, maxFreq:  4000 },
+      { ns:    6, cutoff:  1300, maxFreq:  4000 },
+      { ns:    9, cutoff:   800, maxFreq:  4000 },
+      { ns:   13, cutoff:   550, maxFreq:  3000 },
+      { ns:   20, cutoff:   330, maxFreq:  3000 },
+      { ns:   30, cutoff:   250, maxFreq:  3000 },
+      { ns:   45, cutoff:   200, maxFreq:  2000 },
+      { ns:   60, cutoff:   180, maxFreq:  2000 },
+      { ns:   80, cutoff:   150, maxFreq:  2000 },
+      { ns:  100, cutoff:   140, maxFreq:  1000 },
+      { ns:  150, cutoff:    76, maxFreq:  1000 },
+      { ns:  200, cutoff:    60, maxFreq:  1000 },
+      { ns:  250, cutoff:    56, maxFreq:   900 },
+      { ns:  350, cutoff:    53, maxFreq:   600 },
+      { ns:  500, cutoff:    53, maxFreq:   500 },
+    ]
+  },
+
+
+  {
+    id: 'jpt-m7-100', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-100-M7-M-R',
+    watts: 100, beamDiam: 7.0, mSquared: 1.4,
+    maxPulseEnMJ: 1.5,
+    pulses: [
+      { ns:    2, cutoff:  2960, maxFreq:  4000 },
+      { ns:    4, cutoff:  2160, maxFreq:  4000 },
+      { ns:    6, cutoff:  1400, maxFreq:  4000 },
+      { ns:    9, cutoff:   960, maxFreq:  4000 },
+      { ns:   13, cutoff:   680, maxFreq:  3000 },
+      { ns:   20, cutoff:   420, maxFreq:  3000 },
+      { ns:   30, cutoff:   300, maxFreq:  3000 },
+      { ns:   45, cutoff:   250, maxFreq:  2000 },
+      { ns:   60, cutoff:   200, maxFreq:  2000 },
+      { ns:   80, cutoff:   180, maxFreq:  2000 },
+      { ns:  100, cutoff:   160, maxFreq:  1000 },
+      { ns:  150, cutoff:    95, maxFreq:  1000 },
+      { ns:  200, cutoff:    75, maxFreq:  1000 },
+      { ns:  250, cutoff:    70, maxFreq:   900 },
+      { ns:  350, cutoff:    67, maxFreq:   600 },
+      { ns:  500, cutoff:    67, maxFreq:   500 },
+    ]
+  },
+
+  {
+    id: 'jpt-e-100', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-E-100-M7-M-R',
+    watts: 100, beamDiam: 7.0, mSquared: 1.6,
+    pulses: [
+      { ns:    2, cutoff:  2960, maxFreq:  4000 },
+      { ns:    4, cutoff:  2160, maxFreq:  4000 },
+      { ns:    6, cutoff:  1400, maxFreq:  4000 },
+      { ns:    9, cutoff:   960, maxFreq:  4000 },
+      { ns:   13, cutoff:   680, maxFreq:  3000 },
+      { ns:   20, cutoff:   420, maxFreq:  3000 },
+      { ns:   30, cutoff:   300, maxFreq:  3000 },
+      { ns:   45, cutoff:   250, maxFreq:  2000 },
+      { ns:   60, cutoff:   200, maxFreq:  2000 },
+      { ns:   80, cutoff:   180, maxFreq:  2000 },
+      { ns:  100, cutoff:   160, maxFreq:  1000 },
+      { ns:  150, cutoff:    95, maxFreq:  1000 },
+      { ns:  200, cutoff:    75, maxFreq:  1000 },
+      { ns:  250, cutoff:    70, maxFreq:   900 },
+      { ns:  350, cutoff:    67, maxFreq:   600 },
+      { ns:  500, cutoff:    67, maxFreq:   500 },
+    ]
+  },
+
+
+  {
+    id: 'jpt-e2-100', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-E2-100-M7-M-R',
+    watts: 100, beamDiam: 7.0, mSquared: 1.6,
+    pulses: [
+      { ns:    2, cutoff:  2960, maxFreq:  4000 },
+      { ns:    4, cutoff:  2160, maxFreq:  4000 },
+      { ns:    6, cutoff:  1400, maxFreq:  4000 },
+      { ns:    9, cutoff:   960, maxFreq:  4000 },
+      { ns:   13, cutoff:   680, maxFreq:  3000 },
+      { ns:   20, cutoff:   420, maxFreq:  3000 },
+      { ns:   30, cutoff:   300, maxFreq:  3000 },
+      { ns:   45, cutoff:   250, maxFreq:  2000 },
+      { ns:   60, cutoff:   200, maxFreq:  2000 },
+      { ns:   80, cutoff:   180, maxFreq:  2000 },
+      { ns:  100, cutoff:   160, maxFreq:  1000 },
+      { ns:  150, cutoff:    95, maxFreq:  1000 },
+      { ns:  200, cutoff:    75, maxFreq:  1000 },
+      { ns:  250, cutoff:    70, maxFreq:   900 },
+      { ns:  350, cutoff:    67, maxFreq:   600 },
+      { ns:  500, cutoff:    67, maxFreq:   500 },
+    ]
+  },
+
+  {
+    id: 'jpt-m7-120', brand: 'JPT', type: 'mopa',
+    name: 'YDFLP-120-M7-M-R',
+    watts: 120, beamDiam: 7.0, mSquared: 1.4,
+    maxPulseEnMJ: 1.5,
+    pulses: [
+      { ns:    2, cutoff:  3900, maxFreq:  4000 },
+      { ns:    4, cutoff:  2700, maxFreq:  4000 },
+      { ns:    6, cutoff:  1950, maxFreq:  4000 },
+      { ns:    9, cutoff:  1200, maxFreq:  4000 },
+      { ns:   13, cutoff:   825, maxFreq:  3000 },
+      { ns:   20, cutoff:   500, maxFreq:  3000 },
+      { ns:   30, cutoff:   300, maxFreq:  3000 },
+      { ns:   45, cutoff:   240, maxFreq:  2000 },
+      { ns:   60, cutoff:   216, maxFreq:  2000 },
+      { ns:   80, cutoff:   210, maxFreq:  2000 },
+      { ns:  100, cutoff:   190, maxFreq:  1000 },
+      { ns:  150, cutoff:   115, maxFreq:  1000 },
+      { ns:  200, cutoff:    90, maxFreq:  1000 },
+      { ns:  250, cutoff:    85, maxFreq:   900 },
+      { ns:  350, cutoff:    80, maxFreq:   600 },
+      { ns:  500, cutoff:    80, maxFreq:   500 },
+    ]
+  },
+
+  {
+    id: 'jpt-l1-m7-150', brand: 'JPT', type: 'mopa',
+    name: 'YDFLPC-150-M7-L1-X',
+    watts: 150, beamDiam: 6.5, mSquared: 1.8,
+    maxPulseEnMJ: 1.5,
+    pulses: [
+      { ns:    4, cutoff:  4000, maxFreq:  4000 },
+      { ns:    8, cutoff:  2300, maxFreq:  4000 },
+      { ns:   13, cutoff:  1500, maxFreq:  3000 },
+      { ns:   20, cutoff:  1000, maxFreq:  3000 },
+      { ns:   30, cutoff:   700, maxFreq:  3000 },
+      { ns:   45, cutoff:   550, maxFreq:  2000 },
+      { ns:   60, cutoff:   450, maxFreq:  2000 },
+      { ns:   80, cutoff:   340, maxFreq:  2000 },
+      { ns:  100, cutoff:   280, maxFreq:  1000 },
+      { ns:  150, cutoff:   150, maxFreq:  1000 },
+      { ns:  200, cutoff:   120, maxFreq:  1000 },
+      { ns:  250, cutoff:   100, maxFreq:   900 },
+      { ns:  350, cutoff:   100, maxFreq:   600 },
+      { ns:  500, cutoff:   100, maxFreq:   500 },
+    ]
+  },
+
+  {
+    id: 'jpt-l1-m7-200', brand: 'JPT', type: 'mopa',
+    name: 'YDFLPC-200-M7-L1-X',
+    watts: 200, beamDiam: 6.5, mSquared: 1.8,
+    maxPulseEnMJ: 1.5,
+    pulses: [
+      { ns:    8, cutoff:  3000, maxFreq:  4000 },
+      { ns:   13, cutoff:  2000, maxFreq:  3000 },
+      { ns:   20, cutoff:  1200, maxFreq:  3000 },
+      { ns:   30, cutoff:   900, maxFreq:  3000 },
+      { ns:   40, cutoff:   700, maxFreq:  2000 },
+      { ns:   50, cutoff:   600, maxFreq:  2000 },
+      { ns:   60, cutoff:   550, maxFreq:  2000 },
+      { ns:   80, cutoff:   450, maxFreq:  2000 },
+      { ns:  100, cutoff:   350, maxFreq:  1000 },
+      { ns:  150, cutoff:   200, maxFreq:  1000 },
+      { ns:  200, cutoff:   150, maxFreq:  1000 },
+      { ns:  250, cutoff:   130, maxFreq:   900 },
+      { ns:  350, cutoff:   130, maxFreq:   600 },
+      { ns:  500, cutoff:   130, maxFreq:   500 },
+    ]
+  },
+
+  // ══ Raycus ══════════════════════════════════════════════
+
+  {
+    id: 'raycus-p10q', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P10Q',
+    watts: 10, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 1.0,
+    minFreq: 20, maxFreq: 60,
+    tauMin: 80, tauMax: 100,
+  },
+
+  {
+    id: 'raycus-p20mx', brand: 'Raycus', type: 'mopa',
+    name: 'RFL-P20MX',
+    watts: 20, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 0.71,
+    pulses: [
+      { ns:    2, cutoff:  2000, maxFreq:  2000 },
+      { ns:    4, cutoff:   500, maxFreq:  2000 },
+      { ns:    8, cutoff:   300, maxFreq:  1000 },
+      { ns:   14, cutoff:   200, maxFreq:  1000 },
+      { ns:   20, cutoff:   150, maxFreq:  1000 },
+      { ns:   30, cutoff:   100, maxFreq:  1000 },
+      { ns:   50, cutoff:    80, maxFreq:  1000 },
+      { ns:  100, cutoff:    60, maxFreq:  1000 },
+      { ns:  200, cutoff:    40, maxFreq:   500 },
+      { ns:  250, cutoff:    36, maxFreq:   400 },
+      { ns:  350, cutoff:    32, maxFreq:   400 },
+      { ns:  500, cutoff:    28, maxFreq:   300 },
+    ]
+  },
+
+  {
+    id: 'raycus-p20q', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P20Q',
+    watts: 20, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 1.0,
+    minFreq: 20, maxFreq: 60,
+    tauMin: 90, tauMax: 130,
+  },
+
+  {
+    id: 'raycus-p20qb', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P20QB',
+    watts: 20, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 1.0,
+    minFreq: 20, maxFreq: 60,
+    tauMin: 90, tauMax: 110,
+  },
+
+  {
+    id: 'raycus-p20qe', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P20QE',
+    watts: 20, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 0.66,
+    minFreq: 30, maxFreq: 60,
+    tauMin: 115, tauMax: 140,
+  },
+
+  {
+    id: 'raycus-p20qs', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P20QS',
+    watts: 20, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 0.66,
+    minFreq: 30, maxFreq: 60,
+    tauMin: 120, tauMax: 150,
+  },
+
+  {
+    id: 'raycus-p30mx', brand: 'Raycus', type: 'mopa',
+    name: 'RFL-P30MX',
+    watts: 30, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.0,
+    pulses: [
+      { ns:    2, cutoff:  2000, maxFreq:  2000 },
+      { ns:    4, cutoff:   500, maxFreq:  2000 },
+      { ns:    8, cutoff:   375, maxFreq:  1000 },
+      { ns:   14, cutoff:   250, maxFreq:  1000 },
+      { ns:   20, cutoff:   170, maxFreq:  1000 },
+      { ns:   30, cutoff:   135, maxFreq:  1000 },
+      { ns:   50, cutoff:   100, maxFreq:  1000 },
+      { ns:  100, cutoff:    65, maxFreq:  1000 },
+      { ns:  200, cutoff:    45, maxFreq:   500 },
+      { ns:  250, cutoff:    40, maxFreq:   400 },
+      { ns:  350, cutoff:    36, maxFreq:   400 },
+      { ns:  500, cutoff:    30, maxFreq:   300 },
+    ]
+  },
+
+  {
+    id: 'raycus-p30q', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P30Q',
+    watts: 30, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 1.0,
+    minFreq: 30, maxFreq: 60,
+    tauMin: 120, tauMax: 150,
+  },
+
+  {
+    id: 'raycus-p30qb', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P30QB',
+    watts: 30, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 1.0,
+    minFreq: 30, maxFreq: 60,
+    tauMin: 120, tauMax: 150,
+  },
+
+  {
+    id: 'raycus-p30qs', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P30QS',
+    watts: 30, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 0.75,
+    minFreq: 40, maxFreq: 60,
+    tauMin: 130, tauMax: 160,
+  },
+
+  {
+    id: 'raycus-p50qb', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P50QB',
+    watts: 50, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.0,
+    minFreq: 50, maxFreq: 100,
+    tauMin: 120, tauMax: 150,
+  },
+
+  {
+    id: 'raycus-p60mx', brand: 'Raycus', type: 'mopa',
+    name: 'RFL-P60MX',
+    watts: 60, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.5,
+    pulses: [
+      { ns:   10, cutoff:   600, maxFreq:  2000 },
+      { ns:   20, cutoff:   300, maxFreq:  2000 },
+      { ns:   30, cutoff:   198, maxFreq:  1000 },
+      { ns:   60, cutoff:   120, maxFreq:  1000 },
+      { ns:  100, cutoff:    75, maxFreq:  1000 },
+      { ns:  200, cutoff:    48, maxFreq:   500 },
+      { ns:  250, cutoff:    43, maxFreq:   500 },
+      { ns:  350, cutoff:    40, maxFreq:   400 },
+    ]
+  },
+
+  {
+    id: 'raycus-p60qb', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P60QB',
+    watts: 60, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.09,
+    minFreq: 55, maxFreq: 100,
+    tauMin: 120, tauMax: 150,
+  },
+
+  {
+    id: 'raycus-p70mx', brand: 'Raycus', type: 'mopa',
+    name: 'RFL-P70MX',
+    watts: 70, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.5,
+    pulses: [
+      { ns:   10, cutoff:   700, maxFreq:  2000 },
+      { ns:   20, cutoff:   350, maxFreq:  2000 },
+      { ns:   30, cutoff:   231, maxFreq:  1000 },
+      { ns:   60, cutoff:   140, maxFreq:  1000 },
+      { ns:  100, cutoff:    88, maxFreq:  1000 },
+      { ns:  200, cutoff:    56, maxFreq:   500 },
+      { ns:  250, cutoff:    51, maxFreq:   500 },
+      { ns:  350, cutoff:    46, maxFreq:   400 },
+    ]
+  },
+
+  {
+    id: 'raycus-p70q', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P70Q',
+    watts: 70, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.0,
+    minFreq: 20, maxFreq: 100,
+    tauMin: 50, tauMax: 130,
+  },
+
+  {
+    id: 'raycus-p70qa', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P70QA',
+    watts: 70, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.16,
+    minFreq: 60, maxFreq: 100,
+    tauMin: 200, tauMax: 240,
+  },
+
+  {
+    id: 'raycus-p100mx', brand: 'Raycus', type: 'mopa',
+    name: 'RFL-P100MX',
+    watts: 100, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.5,
+    pulses: [
+      { ns:   10, cutoff:  1000, maxFreq:  2000 },
+      { ns:   20, cutoff:   500, maxFreq:  2000 },
+      { ns:   30, cutoff:   330, maxFreq:  1000 },
+      { ns:   60, cutoff:   200, maxFreq:  1000 },
+      { ns:  100, cutoff:   125, maxFreq:  1000 },
+      { ns:  200, cutoff:    80, maxFreq:   500 },
+      { ns:  250, cutoff:    72, maxFreq:   500 },
+      { ns:  350, cutoff:    66, maxFreq:   400 },
+    ]
+  },
+
+  {
+    id: 'raycus-p100q', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P100Q',
+    watts: 100, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.0,
+    minFreq: 20, maxFreq: 200,
+    tauMin: 50, tauMax: 130,
+  },
+
+  {
+    id: 'raycus-p100qa', brand: 'Raycus', type: 'qsw',
+    name: 'RFL-P100QA',
+    watts: 100, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.25,
+    minFreq: 80, maxFreq: 120,
+    tauMin: 250, tauMax: 290,
+  },
+
+  {
+    id: 'raycus-p120mx', brand: 'Raycus', type: 'mopa',
+    name: 'RFL-P120MX',
+    watts: 120, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.5,
+    pulses: [
+      { ns:   10, cutoff:  1200, maxFreq:  2000 },
+      { ns:   20, cutoff:   600, maxFreq:  2000 },
+      { ns:   30, cutoff:   395, maxFreq:  1000 },
+      { ns:   60, cutoff:   240, maxFreq:  1000 },
+      { ns:  100, cutoff:   150, maxFreq:  1000 },
+      { ns:  200, cutoff:    95, maxFreq:   500 },
+      { ns:  250, cutoff:    85, maxFreq:   500 },
+      { ns:  350, cutoff:    80, maxFreq:   400 },
+    ]
+  },
+
+  {
+    id: 'raycus-p200mx', brand: 'Raycus', type: 'mopa',
+    name: 'RFL-P200MX',
+    watts: 200, beamDiam: 7.0, mSquared: 1.8,
+    maxPulseEnMJ: 1.5,
+    pulses: [
+      { ns:   10, cutoff:  3000, maxFreq:  4000 },
+      { ns:   20, cutoff:  1200, maxFreq:  3000 },
+      { ns:   30, cutoff:   900, maxFreq:  3000 },
+      { ns:   60, cutoff:   550, maxFreq:  2000 },
+      { ns:  100, cutoff:   350, maxFreq:  1000 },
+      { ns:  200, cutoff:   170, maxFreq:  1000 },
+      { ns:  250, cutoff:   150, maxFreq:   900 },
+      { ns:  350, cutoff:   130, maxFreq:   600 },
+    ]
+  },
+
+  {
+    id: 'raycus-p200s', brand: 'Raycus', type: 'mopa',
+    name: 'RFL-P200S',
+    watts: 200, beamDiam: 7.0, mSquared: 1.8,
+    maxPulseEnMJ: 1.0,
+    pulses: [
+      { ns:   10, cutoff:  3000, maxFreq:  4000 },
+      { ns:   20, cutoff:  1200, maxFreq:  3000 },
+      { ns:   30, cutoff:   900, maxFreq:  3000 },
+      { ns:   60, cutoff:   550, maxFreq:  2000 },
+      { ns:  100, cutoff:   350, maxFreq:  1000 },
+      { ns:  200, cutoff:   220, maxFreq:  1000 },
+      { ns:  250, cutoff:   200, maxFreq:   900 },
+      { ns:  350, cutoff:   200, maxFreq:   600 },
+    ]
+  },
+
+  // ══ Max Photonics ══════════════════════════════════════════════
+
+  {
+    id: 'max-mfp-10w', brand: 'Max Photonics', type: 'qsw',
+    name: 'MFP-10W',
+    watts: 10, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 0.45,
+    minFreq: 20, maxFreq: 60,
+    tauMin: 80, tauMax: 120,
+  },
+
+  {
+    id: 'max-mfp-20wx', brand: 'Max Photonics', type: 'qsw',
+    name: 'MFP-20W/X',
+    watts: 20, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 0.75,
+    minFreq: 20, maxFreq: 60,
+    tauMin: 80, tauMax: 120,
+  },
+
+  {
+    id: 'max-mfp-30w', brand: 'Max Photonics', type: 'qsw',
+    name: 'MFP-30W',
+    watts: 30, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 1.0,
+    minFreq: 30, maxFreq: 60,
+    tauMin: 80, tauMax: 120,
+  },
+
+  {
+    id: 'max-mfp-30x', brand: 'Max Photonics', type: 'qsw',
+    name: 'MFP-30X',
+    watts: 30, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 0.75,
+    minFreq: 30, maxFreq: 60,
+    tauMin: 80, tauMax: 120,
+    wattsAtMinFreq: 25, wattsAtMaxFreq: 30,
+    powerInterpMinFreq: 30, powerInterpMaxFreq: 40,
+  },
+
+  {
+    id: 'max-mfp-50w', brand: 'Max Photonics', type: 'qsw',
+    name: 'MFP-50W',
+    watts: 50, beamDiam: 7.0, mSquared: 1.5,
+    maxPulseEnMJ: 1.0,
+    minFreq: 50, maxFreq: 80,
+    tauMin: 80, tauMax: 120,
+  },
+
+  {
+    id: 'max-mfp-50x', brand: 'Max Photonics', type: 'qsw',
+    name: 'MFP-50X',
+    watts: 50, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.0,
+    minFreq: 50, maxFreq: 170,
+    tauMin: 80, tauMax: 120,
+  },
+
+  {
+    id: 'max-mfp-70w', brand: 'Max Photonics', type: 'qsw',
+    name: 'MFP-70W',
+    watts: 70, beamDiam: 7.0, mSquared: 1.6,
+    maxPulseEnMJ: 1.5,
+    minFreq: 50, maxFreq: 170,
+    tauMin: 100, tauMax: 140,
+  },
+
+  {
+    id: 'max-mfp-100w', brand: 'Max Photonics', type: 'qsw',
+    name: 'MFP-100W',
+    watts: 100, beamDiam: 7.0, mSquared: 2.0,
+    maxPulseEnMJ: 8.0,
+    minFreq: 20, maxFreq: 200,
+    tauMin: 150, tauMax: 190,
+  },
+
+  {
+    id: 'max-mfp-200w', brand: 'Max Photonics', type: 'qsw',
+    name: 'MFP-200W',
+    watts: 200, beamDiam: 7.0, mSquared: 2.0,
+    maxPulseEnMJ: 8.0,
+    minFreq: 20, maxFreq: 200,
+    tauMin: 180, tauMax: 220,
+  },
+
+];
+
+const BRAND_ORDER = ['JPT', 'Raycus', 'Max Photonics', 'Custom'];
+
+// ═══════════════════════════════════════════════════════════════
+//  STORAGE
+// ═══════════════════════════════════════════════════════════════
+function loadCustom() { try { return JSON.parse(localStorage.getItem('customLasers') || '[]'); } catch { return []; } }
+function saveCustom(arr) { try { localStorage.setItem('customLasers', JSON.stringify(arr)); } catch {} }
+function allLasers() { return [...BUILTIN_LASERS, ...loadCustom()]; }
+function getLaser(id) { return allLasers().find(l => l.id === id); }
+
+// ── Favourites ─────────────────────────────────────────────────
+function loadFavs() { try { return JSON.parse(localStorage.getItem('favLasers') || '[]'); } catch { return []; } }
+function saveFavs(arr) { try { localStorage.setItem('favLasers', JSON.stringify(arr)); } catch {} }
+function isFav(id) { return loadFavs().includes(id); }
+function toggleFav(id) {
+  const favs = loadFavs();
+  const idx = favs.indexOf(id);
+  if (idx >= 0) favs.splice(idx, 1); else favs.push(id);
+  saveFavs(favs);
+}
+
+// ── Last used ──────────────────────────────────────────────────
+function saveLastUsed(brand, id) { try { localStorage.setItem('lastUsed', JSON.stringify({brand, id})); } catch {} }
+function loadLastUsed() { try { return JSON.parse(localStorage.getItem('lastUsed') || 'null'); } catch { return null; } }
+
+// ── Update fav button state ────────────────────────────────────
+function updateFavBtn() {
+  const btn = $('favBtn');
+  if (!btn) return;
+  const id = modelSelect.value;
+  const fav = isFav(id);
+  btn.textContent = fav ? '★' : '☆';
+  btn.style.color = fav ? 'var(--amber)' : 'var(--text-faint)';
+  btn.style.borderColor = fav ? 'var(--amber-dim)' : 'var(--border)';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DOM REFS
+// ═══════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const brandSelect = $('brandSelect');
+const modelSelect = $('modelSelect');
+const freqSlider  = $('freqSlider');
+const freqManual  = $('freqManual');
+
+// ═══════════════════════════════════════════════════════════════
+//  BUILD DROPDOWNS
+// ═══════════════════════════════════════════════════════════════
+function buildBrandDropdown(selectBrand) {
+  const prev = selectBrand || brandSelect.value;
+  brandSelect.innerHTML = '';
+  // Favourites group at top if any exist
+  const favs = loadFavs();
+  if (favs.length) {
+    const opt = document.createElement('option');
+    opt.value = '★ Favourites'; opt.textContent = '★ Favourites';
+    brandSelect.appendChild(opt);
+  }
+  const brands = [...new Set(allLasers().map(l => l.brand || 'Custom'))];
+  BRAND_ORDER.forEach(b => {
+    if (!brands.includes(b)) return;
+    const opt = document.createElement('option');
+    opt.value = b; opt.textContent = b;
+    brandSelect.appendChild(opt);
+  });
+  // any brands not in order list
+  brands.filter(b => !BRAND_ORDER.includes(b)).forEach(b => {
+    const opt = document.createElement('option');
+    opt.value = b; opt.textContent = b;
+    brandSelect.appendChild(opt);
+  });
+  if (prev && [...brandSelect.options].some(o => o.value === prev)) brandSelect.value = prev;
+}
+
+function buildModelDropdown(selectId) {
+  const brand = brandSelect.value;
+  const prev  = selectId || modelSelect.value;
+  modelSelect.innerHTML = '';
+  if (brand === '★ Favourites') {
+    const favs = loadFavs();
+    allLasers().filter(l => favs.includes(l.id)).forEach(l => {
+      const opt = document.createElement('option');
+      opt.value = l.id;
+      opt.textContent = l.name + ' (' + (l.brand || 'Custom') + ')';
+      modelSelect.appendChild(opt);
+    });
+  } else {
+    allLasers().filter(l => (l.brand || 'Custom') === brand).forEach(l => {
+      const opt = document.createElement('option');
+      opt.value = l.id;
+      opt.textContent = l.name;
+      modelSelect.appendChild(opt);
+    });
+  }
+  if (prev && [...modelSelect.options].some(o => o.value === prev)) modelSelect.value = prev;
+  updateFavBtn();
+  applyModel();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  APPLY MODEL
+// ═══════════════════════════════════════════════════════════════
+function applyModel() {
+  const laser = getLaser(modelSelect.value);
+  if (!laser) return;
+
+  // Save last used (skip Favourites pseudo-brand)
+  if (brandSelect.value !== '★ Favourites') {
+    saveLastUsed(laser.brand || 'Custom', laser.id);
+  }
+  updateFavBtn();
+
+  $('beamDiam').value  = laser.beamDiam;
+  $('mSquared').value  = laser.mSquared || 1.4;
+
+  if (laser.type === 'mopa') {
+    $('mopaControls').style.display = '';
+    $('qswControls').style.display  = 'none';
+    buildPulseDropdown();
+  } else {
+    // Q-switched
+    $('mopaControls').style.display = 'none';
+    $('qswControls').style.display  = '';
+    $('qswMinFreq').value = laser.minFreq;
+    $('qswMaxFreq').value = laser.maxFreq;
+    setSliderRange(laser.minFreq, laser.maxFreq);
+    updateBadge(laser);
+    calculate();
+  }
+}
+
+// ── MOPA: build pulse dropdown ─────────────────────────────────
+function buildPulseDropdown(preferNs) {
+  const laser = getLaser(modelSelect.value);
+  if (!laser || laser.type !== 'mopa') return;
+  const prev = preferNs || parseInt($('pulseSelect').value) || 100;
+  $('pulseSelect').innerHTML = '';
+  laser.pulses.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.ns; opt.textContent = p.ns + ' ns';
+    $('pulseSelect').appendChild(opt);
+  });
+  const match = laser.pulses.find(p => p.ns === prev);
+  $('pulseSelect').value = match ? prev : (laser.pulses.find(p => p.ns === 100)?.ns || laser.pulses[0].ns);
+  applyPulseRow();
+}
+
+function applyPulseRow() {
+  const laser = getLaser(modelSelect.value);
+  if (!laser || laser.type !== 'mopa') return;
+  const ns  = parseInt($('pulseSelect').value);
+  const row = laser.pulses.find(p => p.ns === ns);
+  if (!row) return;
+  $('cutoffFreq').value = row.cutoff;
+  $('maxFreq').value    = row.maxFreq;
+  const maxEnMJ = (laser.watts / (row.cutoff * 1000)) * 1e3;
+  const capNote = laser.maxPulseEnMJ != null
+    ? ` · spec max <span style="color:var(--amber)">${laser.maxPulseEnMJ} mJ</span>`
+    : '';
+  $('derivedEnergy').innerHTML = maxEnMJ.toFixed(4) + ' mJ / pulse' + capNote;
+  setSliderRange(1, row.maxFreq, row.cutoff);
+  updateBadge(laser, ns, row);
+  calculate();
+}
+
+// ── Slider range ───────────────────────────────────────────────
+function updateSliderFill(slider) {
+  const min = parseFloat(slider.min) || 0;
+  const max = parseFloat(slider.max) || 100;
+  const pct = ((parseFloat(slider.value) - min) / (max - min)) * 100;
+  slider.style.setProperty('--pct', pct.toFixed(1) + '%');
+}
+
+function setSliderRange(minF, maxF, defaultFreq) {
+  freqSlider.min = minF || 1;
+  freqSlider.max = maxF;
+  freqManual.max = maxF;
+  $('tickMin').textContent = (minF || 1) + '';
+  $('tickMax').textContent = maxF + ' kHz';
+  $('tickMid').textContent = Math.round(((minF||1) + maxF) / 2);
+  const cur     = parseFloat(freqManual.value) || defaultFreq || maxF;
+  const clamped = Math.min(Math.max(cur, minF || 1), maxF);
+  freqManual.value = clamped;
+  freqSlider.value = clamped;
+  updateSliderFill(freqSlider);
+}
+
+// ── Badge ──────────────────────────────────────────────────────
+function updateBadge(laser, ns, row) {
+  const isCustom = loadCustom().some(l => l.id === laser.id);
+  const typeLabel = laser.type === 'mopa'
+    ? '<span class="type-badge mopa">MOPA</span>'
+    : '<span class="type-badge qsw">Q-SW</span>';
+
+  let detail = '';
+  if (laser.type === 'mopa' && row) {
+    const maxEnMJ = (laser.watts / (row.cutoff * 1000)) * 1e3;
+    detail = `pulse <span>${ns}ns</span> · cutoff <span>${row.cutoff} kHz</span> · max <span>${row.maxFreq} kHz</span> · max E <span>${maxEnMJ.toFixed(3)} mJ</span>`;
+  } else if (laser.type === 'qsw') {
+    const powerStr = laser.wattsAtMinFreq != null
+      ? `<span>${laser.wattsAtMinFreq}–${laser.wattsAtMaxFreq}W</span> (${laser.powerInterpMinFreq}–${laser.powerInterpMaxFreq} kHz)`
+      : `<span>${laser.watts}W</span>`;
+    const maxEStr = laser.maxPulseEnMJ != null ? ` · max E <span>${laser.maxPulseEnMJ} mJ</span>` : '';
+    detail = `${powerStr} · PRF <span>${laser.minFreq}–${laser.maxFreq} kHz</span> · τ <span>${laser.tauMin}–${laser.tauMax} ns</span>${maxEStr}`;
+  }
+
+  const wattsLabel = (laser.type === 'qsw' && laser.wattsAtMinFreq != null)
+    ? `${laser.wattsAtMinFreq}–${laser.wattsAtMaxFreq}W`
+    : `${laser.watts}W`;
+
+  $('modelBadge').innerHTML =
+    `${typeLabel} <span>${wattsLabel}</span> · beam <span>${laser.beamDiam}mm</span> · ${detail}` +
+    (isCustom ? ` <span class="edit-link" id="editLink">✎ edit</span>` : '');
+
+  const el = $('editLink');
+  if (el) el.addEventListener('click', () => {
+    const l = loadCustom().find(x => x.id === laser.id);
+    if (l) openModal(l);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FORMAT HELPERS
+// ═══════════════════════════════════════════════════════════════
+function fmtEnergy(j) {
+  if (j <= 0)   return ['0.000', 'J / pulse'];
+  if (j < 1e-6) return [(j*1e9).toFixed(3), 'nJ / pulse'];
+  if (j < 1e-3) return [(j*1e6).toFixed(3), 'μJ / pulse'];
+  if (j < 1)    return [(j*1e3).toFixed(4), 'mJ / pulse'];
+  return [j.toFixed(4), 'J / pulse'];
+}
+function fmtPower(w) {
+  if (w <= 0)   return ['0.000', 'W (peak)'];
+  if (w >= 1e9) return [(w/1e9).toFixed(3), 'GW (peak)'];
+  if (w >= 1e6) return [(w/1e6).toFixed(3), 'MW (peak)'];
+  if (w >= 1e3) return [(w/1e3).toFixed(3), 'kW (peak)'];
+  return [w.toFixed(2), 'W (peak)'];
+}
+function fmtPeriod(us) {
+  if (us <= 0)    return ['—', ''];
+  if (us >= 1000) return [(us/1000).toFixed(3), 'ms / cycle'];
+  if (us >= 1)    return [us.toFixed(3), 'μs / cycle'];
+  return [(us*1000).toFixed(1), 'ns / cycle'];
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LIVE CALCULATION STATE
+//  Populated by calculate() so tooltips can show live values
+// ═══════════════════════════════════════════════════════════════
+let LIVE = {
+  laserType: 'mopa',
+  outputWatts: 0, powerPct: 100,
+  effectivePulseEnJ: 0, setFreqKHz: 30,
+  effectivePeakW: 0, pulseDurNs: 100,
+  periodUs: 0,
+  spotDiamUm: 0, beamDiamMm: 7, focalLenMm: 175, mSq: 1.4,
+  fluenceJcm2: 0, spotAreaCm2: 0,
+  laserWatts: 60, cutoffKHz: 0, maxPulseEnJ: 0,
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  CALCULATE
+// ═══════════════════════════════════════════════════════════════
+function calculate() {
+  const laser = getLaser(modelSelect.value);
+  if (!laser) return;
+
+  const setFreqKHz = parseFloat(freqManual.value) || 1;
+  const beamDiamMm = parseFloat($('beamDiam').value) || 0;
+  const focalLenMm = parseFloat($('focalLen').value) || 0;
+  const mSq        = Math.max(1.0, parseFloat($('mSquared').value) || 1.0);
+
+  let laserWatts, effectivePulseEnJ, outputWatts, pulseDurNs, clamped,
+      freqClamped = false, freqTooLow = false, maxFreqKHz, minFreqKHz = 1;
+
+  // ── MOPA physics ───────────────────────────────────────────
+  if (laser.type === 'mopa') {
+    const powerPct  = Math.min(100, Math.max(0, parseFloat($('powerPercent').value) || 0));
+    const cutoffKHz = parseFloat($('cutoffFreq').value) || 0;
+    maxFreqKHz      = parseFloat($('maxFreq').value)    || 1;
+    laserWatts      = laser.watts;
+    pulseDurNs      = parseFloat($('pulseSelect').value) || 100;
+    const maxPulseEnJ     = cutoffKHz > 0 ? laserWatts / (cutoffKHz * 1000) : 0;
+    freqClamped           = setFreqKHz > maxFreqKHz;
+    const effectiveFreqKHz = freqClamped ? maxFreqKHz : setFreqKHz;
+    const effectiveFreqHz  = effectiveFreqKHz * 1000;
+    const cutoffHz         = cutoffKHz * 1000;
+    const scaledMaxWatts   = laserWatts * (powerPct / 100);
+    const scaledMaxEnJ     = maxPulseEnJ * (powerPct / 100);
+
+    if (effectiveFreqHz <= cutoffHz || cutoffHz === 0) {
+      effectivePulseEnJ = scaledMaxEnJ;
+      outputWatts       = effectiveFreqHz * effectivePulseEnJ;
+      clamped           = outputWatts > scaledMaxWatts;
+      if (clamped) outputWatts = scaledMaxWatts;
+    } else {
+      outputWatts       = scaledMaxWatts;
+      effectivePulseEnJ = effectiveFreqHz > 0 ? outputWatts / effectiveFreqHz : 0;
+      clamped           = false;
+    }
+
+    // Apply spec-sheet max pulse energy ceiling if defined
+    // (e.g. 100W JPT: 1.5 mJ max — below cutoff at very low freq this could be exceeded)
+    if (laser.maxPulseEnMJ != null) {
+      const hardCapJ = laser.maxPulseEnMJ * 1e-3;
+      if (effectivePulseEnJ > hardCapJ) {
+        effectivePulseEnJ = hardCapJ;
+        outputWatts       = effectivePulseEnJ * effectiveFreqHz;
+        clamped           = true;
+      }
+    }
+
+    const freqNote_cutoff = cutoffKHz * 1000;
+    const effHz = freqClamped ? maxFreqKHz*1000 : setFreqKHz*1000;
+    let fn = '';
+    if (freqClamped) fn = `⚑ Exceeds max pulse freq — clamped to ${maxFreqKHz} kHz`;
+    else if (freqNote_cutoff > 0 && effHz > freqNote_cutoff) fn = `▲ Above cutoff — avg power at rated max; E/pulse & peak decreasing`;
+    else if (freqNote_cutoff > 0 && effHz < freqNote_cutoff) fn = `▼ Below cutoff — E/pulse & peak power are constant (this is correct MOPA behaviour); avg output scales with freq = ${outputWatts.toFixed(2)} W`;
+    else if (freqNote_cutoff > 0) fn = `◆ At cutoff — full pulse energy at rated avg power`;
+    $('freqNote').textContent = fn;
+
+  // ── Q-switched physics ─────────────────────────────────────
+  } else {
+    const powerPct = Math.min(100, Math.max(10, parseFloat($('qswPowerPct').value) || 100));
+    minFreqKHz = laser.minFreq;
+    maxFreqKHz = laser.maxFreq;
+    freqClamped = setFreqKHz > maxFreqKHz;
+    freqTooLow  = setFreqKHz < minFreqKHz;
+    const effectiveFreqKHz = freqClamped ? maxFreqKHz : (freqTooLow ? minFreqKHz : setFreqKHz);
+    const effectiveFreqHz  = effectiveFreqKHz * 1000;
+
+    // Normalised position across the full PRF range (0 = minFreq, 1 = maxFreq)
+    const tFull = (maxFreqKHz === minFreqKHz) ? 1 :
+                  (effectiveFreqKHz - minFreqKHz) / (maxFreqKHz - minFreqKHz);
+
+    // Pulse width: always interpolated across full PRF range
+    pulseDurNs = laser.tauMin + tFull * (laser.tauMax - laser.tauMin);
+
+    // Rated average power: interpolated only if the laser has separate power anchor points
+    // (e.g. MFP-30X which delivers different power at 30 kHz vs 40 kHz)
+    if (laser.wattsAtMinFreq != null && laser.wattsAtMaxFreq != null) {
+      const pMin = laser.powerInterpMinFreq || laser.minFreq;
+      const pMax = laser.powerInterpMaxFreq || laser.maxFreq;
+      const tPow = pMax === pMin ? 1 :
+                   Math.min(1, Math.max(0, (effectiveFreqKHz - pMin) / (pMax - pMin)));
+      laserWatts = laser.wattsAtMinFreq + tPow * (laser.wattsAtMaxFreq - laser.wattsAtMinFreq);
+    } else {
+      laserWatts = laser.watts;
+    }
+
+    // Update the display field
+    $('qswPulseDisplay').textContent = pulseDurNs.toFixed(1) + ' ns';
+
+    // E = P_avg(f) × power% / f   (no cutoff concept for Q-switched)
+    const scaledWatts  = laserWatts * (powerPct / 100);
+    const uncappedEnJ  = effectiveFreqHz > 0 ? scaledWatts / effectiveFreqHz : 0;
+
+    // Apply max pulse energy ceiling from spec sheet.
+    // Below the crossover frequency E_uncapped > maxPulseEnJ, so the laser
+    // internally limits pulse energy — actual avg power drops accordingly.
+    const maxPulseEnJ   = laser.maxPulseEnMJ != null ? laser.maxPulseEnMJ * 1e-3 : Infinity;
+    const pulseEnCapped = uncappedEnJ > maxPulseEnJ;
+    effectivePulseEnJ   = pulseEnCapped ? maxPulseEnJ : uncappedEnJ;
+    outputWatts         = effectivePulseEnJ * effectiveFreqHz;
+    clamped             = pulseEnCapped;
+
+    const powerNote = laser.wattsAtMinFreq != null
+      ? ` · P_rated = ${laserWatts.toFixed(1)}W @ ${effectiveFreqKHz} kHz` : '';
+    let fn = '';
+    if (freqClamped)        fn = `⚑ Exceeds max PRF — clamped to ${maxFreqKHz} kHz`;
+    else if (freqTooLow)    fn = `⚠ Below min PRF for this laser (${minFreqKHz} kHz) — results may be inaccurate`;
+    else if (pulseEnCapped) fn = `⚑ Pulse energy clamped to ${laser.maxPulseEnMJ} mJ max — avg power limited to ${outputWatts.toFixed(1)} W`;
+    else fn = `E/pulse = ${(effectivePulseEnJ*1e3).toFixed(4)} mJ · τ = ${pulseDurNs.toFixed(1)} ns${powerNote}`;
+    $('freqNote').textContent = fn;
+  }
+
+  const pulseDurS      = pulseDurNs * 1e-9;
+  const effectivePeakW = (pulseDurS > 0 && effectivePulseEnJ > 0) ? effectivePulseEnJ / pulseDurS : 0;
+  const periodUs       = (freqClamped ? maxFreqKHz : (freqTooLow ? minFreqKHz : setFreqKHz)) > 0
+                         ? 1e6 / ((freqClamped ? maxFreqKHz : (freqTooLow ? minFreqKHz : setFreqKHz)) * 1000) : 0;
+
+  // Beam optics
+  let spotDiamUm = 0, fluenceJcm2 = 0;
+  if (beamDiamMm > 0 && focalLenMm > 0) {
+    const spotDiamM   = mSq * (4 * LAMBDA_M * focalLenMm*1e-3) / (Math.PI * beamDiamMm*1e-3);
+    spotDiamUm        = spotDiamM * 1e6;
+    const spotAreaCm2 = Math.PI * Math.pow((spotDiamM/2)*100, 2);
+    fluenceJcm2       = spotAreaCm2 > 0 ? effectivePulseEnJ / spotAreaCm2 : 0;
+  }
+
+  let spotDisplay, spotUnit;
+  if      (spotDiamUm <= 0)    { spotDisplay = '—';                           spotUnit = 'μm'; }
+  else if (spotDiamUm < 1)     { spotDisplay = (spotDiamUm*1000).toFixed(1); spotUnit = 'nm'; }
+  else if (spotDiamUm >= 1000) { spotDisplay = (spotDiamUm/1000).toFixed(3); spotUnit = 'mm'; }
+  else                         { spotDisplay = spotDiamUm.toFixed(1);         spotUnit = 'μm'; }
+
+  let fluenceDisplay, fluenceUnit;
+  if      (fluenceJcm2 <= 0)     { fluenceDisplay = '—';                             fluenceUnit = 'J/cm²';  }
+  else if (fluenceJcm2 >= 1000)  { fluenceDisplay = (fluenceJcm2/1000).toFixed(3);  fluenceUnit = 'kJ/cm²'; }
+  else if (fluenceJcm2 >= 1)     { fluenceDisplay = fluenceJcm2.toFixed(3);          fluenceUnit = 'J/cm²';  }
+  else if (fluenceJcm2 >= 0.001) { fluenceDisplay = (fluenceJcm2*1000).toFixed(3);  fluenceUnit = 'mJ/cm²'; }
+  else                           { fluenceDisplay = (fluenceJcm2*1e6).toFixed(3);   fluenceUnit = 'μJ/cm²'; }
+
+  const [pulseEnDisplay, pulseEnUnit] = fmtEnergy(effectivePulseEnJ);
+  const [peakDisplay,    peakUnit]    = fmtPower(effectivePeakW);
+  const [periodDisplay,  periodUnit]  = fmtPeriod(periodUs);
+
+  $('out-watts').textContent        = outputWatts.toFixed(2);
+  $('out-joules').textContent       = pulseEnDisplay;
+  $('out-joules-unit').textContent  = pulseEnUnit;
+  $('out-density').textContent      = peakDisplay;
+  $('out-density-unit').textContent = peakUnit;
+  $('out-period').textContent       = periodDisplay;
+  $('out-period-unit').textContent  = periodUnit;
+  $('out-spot').textContent         = spotDisplay;
+  $('out-spot-unit').textContent    = spotUnit;
+  $('out-fluence').textContent      = fluenceDisplay;
+  $('out-fluence-unit').textContent = fluenceUnit;
+
+  // Update LIVE state for tooltip formulas
+  LIVE = {
+    laserType: laser.type,
+    outputWatts, powerPct: laser.type === 'mopa'
+      ? parseFloat($('powerPercent').value) || 100
+      : parseFloat($('qswPowerPct').value)  || 100,
+    effectivePulseEnJ, setFreqKHz,
+    effectivePeakW, pulseDurNs,
+    periodUs,
+    spotDiamUm, beamDiamMm, focalLenMm, mSq,
+    fluenceJcm2,
+    spotAreaCm2: beamDiamMm > 0 && focalLenMm > 0
+      ? Math.PI * Math.pow((mSq * (4 * LAMBDA_M * focalLenMm*1e-3) / (Math.PI * beamDiamMm*1e-3) / 2) * 100, 2)
+      : 0,
+    laserWatts,
+    cutoffKHz: laser.type === 'mopa' ? (parseFloat($('cutoffFreq').value) || 0) : 0,
+    maxPulseEnJ: laser.type === 'mopa'
+      ? (parseFloat($('cutoffFreq').value) > 0 ? laserWatts / (parseFloat($('cutoffFreq').value) * 1000) : 0)
+      : 0,
+  };
+
+  $('readout-watts').className  = 'readout ' + (clamped ? 'warn' : 'ok');
+  $('badge-watts').className    = 'clamped-badge' + (clamped ? ' show' : '');
+  $('warn-bar').className       = 'warning-bar' + (clamped ? ' visible' : '');
+  $('warn-watts').textContent   = laserWatts;
+  $('warn-pulse').className     = 'warning-bar' + (freqClamped ? ' visible' : '');
+  $('warn-maxfreq').textContent = maxFreqKHz;
+  $('warn-minfreq').className   = 'warning-bar' + (freqTooLow ? ' visible' : '');
+  $('warn-minfreq-val').textContent = minFreqKHz;
+
+  // Recalculate overlap whenever laser params change
+  calculateOverlap();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EVENT LISTENERS
+// ═══════════════════════════════════════════════════════════════
+brandSelect.addEventListener('change', () => buildModelDropdown());
+modelSelect.addEventListener('change', applyModel);
+$('pulseSelect').addEventListener('change', applyPulseRow);
+freqSlider.addEventListener('input', () => {
+  freqManual.value = freqSlider.value;
+  updateSliderFill(freqSlider);
+  calculate();
+});
+freqManual.addEventListener('input', () => {
+  const v    = parseFloat(freqManual.value) || 1;
+  const maxF = parseFloat(freqSlider.max) || 4000;
+  freqSlider.value = Math.min(v, maxF);
+  updateSliderFill(freqSlider);
+  calculate();
+});
+['powerPercent','qswPowerPct','beamDiam','focalLen','mSquared'].forEach(id => $(id).addEventListener('input', calculate));
+
+// ═══════════════════════════════════════════════════════════════
+//  PROCESS PARAMETERS — overlap / gap calculation
+// ═══════════════════════════════════════════════════════════════
+
+let useLPI = true; // true = LPI mode, false = line interval mode
+
+$('btnLPI').addEventListener('click', () => {
+  if (useLPI) return; // already in LPI mode
+  // Convert current line interval mm → LPI
+  const liMm = parseFloat($('liVal').value);
+  if (liMm > 0) $('lpiVal').value = (25.4 / liMm).toFixed(4);
+  useLPI = true;
+  $('btnLPI').classList.add('active');
+  $('btnLI').classList.remove('active');
+  $('lpiField').style.display = '';
+  $('liField').style.display  = 'none';
+  calculateOverlap();
+});
+$('btnLI').addEventListener('click', () => {
+  if (!useLPI) return; // already in line interval mode
+  // Convert current LPI → line interval mm
+  const lpi = parseFloat($('lpiVal').value);
+  if (lpi > 0) $('liVal').value = (25.4 / lpi).toFixed(4);
+  useLPI = false;
+  $('btnLI').classList.add('active');
+  $('btnLPI').classList.remove('active');
+  $('lpiField').style.display = 'none';
+  $('liField').style.display  = '';
+  calculateOverlap();
+});
+['scanSpeed','lpiVal','liVal'].forEach(id => $(id).addEventListener('input', calculateOverlap));
+
+function setOverlapReadout(readoutId, valId, unitId, pct, spotMm) {
+  const readout = $(readoutId);
+  if (pct === null) {
+    readout.className = 'readout info';
+    $(valId).textContent = '—';
+    $(unitId).textContent = '%';
+    return;
+  }
+  const absPct = Math.abs(pct).toFixed(1);
+  if (pct >= 0) {
+    // Overlap
+    readout.className = 'readout overlap';
+    $(valId).textContent = absPct;
+    $(unitId).textContent = '% overlap';
+  } else {
+    // Gap — pct is negative, meaning spacing > spot
+    readout.className = 'readout gap';
+    $(valId).textContent = absPct;
+    $(unitId).textContent = '% gap';
+  }
+}
+
+function calculateOverlap() {
+  const spotMm      = LIVE.spotDiamUm > 0 ? LIVE.spotDiamUm / 1000 : 0;
+  const speedMmS    = parseFloat($('scanSpeed').value) || 0;
+  const freqHz      = LIVE.setFreqKHz * 1000;
+
+  // Line interval in mm
+  const lineIntMm   = useLPI
+    ? (parseFloat($('lpiVal').value) > 0 ? 25.4 / parseFloat($('lpiVal').value) : 0)
+    : (parseFloat($('liVal').value) || 0);
+
+  // Pulse spacing along scan direction
+  const pulseSpacMm = freqHz > 0 && speedMmS > 0 ? speedMmS / freqHz : 0;
+
+  // Update process note
+  if (spotMm <= 0) {
+    $('processNote').textContent = 'Requires focused spot diameter — set Beam Optics inputs.';
+    setOverlapReadout('readout-pulseoverlap','out-pulseoverlap','out-pulseoverlap-unit', null);
+    setOverlapReadout('readout-lineoverlap', 'out-lineoverlap', 'out-lineoverlap-unit',  null);
+    return;
+  }
+  if (speedMmS <= 0 || freqHz <= 0) {
+    $('processNote').textContent = 'Set scan speed and frequency to calculate overlap.';
+    setOverlapReadout('readout-pulseoverlap','out-pulseoverlap','out-pulseoverlap-unit', null);
+    setOverlapReadout('readout-lineoverlap', 'out-lineoverlap', 'out-lineoverlap-unit',  null);
+    return;
+  }
+
+  // pulse overlap: positive = overlap, negative = gap
+  const pulseOverlapPct = (1 - pulseSpacMm / spotMm) * 100;
+  // line overlap
+  const lineOverlapPct  = lineIntMm > 0 ? (1 - lineIntMm / spotMm) * 100 : null;
+
+  // Summary note
+  const lineIntStr = lineIntMm > 0 ? lineIntMm.toFixed(4) + ' mm' : '—';
+  $('processNote').textContent =
+    `Spot: ${LIVE.spotDiamUm.toFixed(1)} μm · Pulse spacing: ${pulseSpacMm.toFixed(4)} mm · Line interval: ${lineIntStr}`;
+
+  setOverlapReadout('readout-pulseoverlap','out-pulseoverlap','out-pulseoverlap-unit', pulseOverlapPct, spotMm);
+  setOverlapReadout('readout-lineoverlap', 'out-lineoverlap', 'out-lineoverlap-unit',  lineOverlapPct,  spotMm);
+
+  // Update LIVE for tooltips
+  LIVE.pulseSpacMm   = pulseSpacMm;
+  LIVE.lineIntMm     = lineIntMm;
+  LIVE.pulseOverlapPct = pulseOverlapPct;
+  LIVE.lineOverlapPct  = lineOverlapPct;
+  LIVE.speedMmS      = speedMmS;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EXPORT / IMPORT
+// ═══════════════════════════════════════════════════════════════
+$('exportBtn').addEventListener('click', () => {
+  const c = loadCustom();
+  if (!c.length) { alert('No custom lasers to export.'); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(c,null,2)], {type:'application/json'}));
+  a.download = 'laser-database.json'; a.click(); URL.revokeObjectURL(a.href);
+});
+$('importBtn').addEventListener('click', () => $('importFileInput').click());
+$('importFileInput').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!Array.isArray(data)) throw new Error('Expected array');
+      data.forEach(l => { if (!l.id||!l.name||!l.watts) throw new Error('Invalid entry'); });
+      saveCustom([...loadCustom().filter(e => !data.some(d => d.id===e.id)), ...data]);
+      buildBrandDropdown(); buildModelDropdown();
+      alert(`✓ Imported ${data.length} laser(s).`);
+    } catch(err) { alert('Import failed: ' + err.message); }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+});
+
+$('exportExampleBtn').addEventListener('click', () => {
+  const example = [
+    {
+      "id": "example-mopa-30w",
+      "brand": "Custom",
+      "type": "mopa",
+      "name": "Example MOPA 30W",
+      "watts": 30,
+      "beamDiam": 7.0,
+      "mSquared": 1.5,
+      "maxPulseEnMJ": 1.0,
+      "pulses": [
+        { "ns":   2, "cutoff":  900, "maxFreq": 4000 },
+        { "ns":   9, "cutoff":  300, "maxFreq": 4000 },
+        { "ns":  20, "cutoff":  126, "maxFreq": 3000 },
+        { "ns":  50, "cutoff":   75, "maxFreq": 2000 },
+        { "ns": 100, "cutoff":   52, "maxFreq": 1000 },
+        { "ns": 200, "cutoff":   24, "maxFreq": 1000 },
+        { "ns": 500, "cutoff":   15, "maxFreq":  500 }
+      ]
+    },
+    {
+      "id": "example-qsw-20w",
+      "brand": "Custom",
+      "type": "qsw",
+      "name": "Example Q-Switched 20W",
+      "watts": 20,
+      "beamDiam": 7.0,
+      "mSquared": 1.5,
+      "minFreq": 20,
+      "maxFreq": 60,
+      "tauMin": 80,
+      "tauMax": 130,
+      "maxPulseEnMJ": 1.0
+    },
+    {
+      "id": "example-qsw-varpower",
+      "brand": "Custom",
+      "type": "qsw",
+      "name": "Example Q-Switched Variable Power",
+      "watts": 30,
+      "beamDiam": 7.0,
+      "mSquared": 1.5,
+      "minFreq": 30,
+      "maxFreq": 60,
+      "tauMin": 80,
+      "tauMax": 120,
+      "maxPulseEnMJ": 0.75,
+      "wattsAtMinFreq": 25,
+      "wattsAtMaxFreq": 30,
+      "powerInterpMinFreq": 30,
+      "powerInterpMaxFreq": 40
+    }
+  ];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(example, null, 2)], {type:'application/json'}));
+  a.download = 'laser-database-example.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ── Changelog modal ────────────────────────────────────────────
+$('changelogBtn').addEventListener('click', () => {
+  $('changelogOverlay').classList.add('open');
+});
+$('closeChangelogBtn').addEventListener('click', () => {
+  $('changelogOverlay').classList.remove('open');
+});
+$('changelogOverlay').addEventListener('click', e => {
+  if (e.target === $('changelogOverlay')) $('changelogOverlay').classList.remove('open');
+});
+// ═══════════════════════════════════════════════════════════════
+let editingId    = null;
+let modalType    = 'mopa';
+
+function setModalType(t) {
+  modalType = t;
+  $('typeMopa').className = 'type-btn' + (t==='mopa' ? ' active-mopa' : '');
+  $('typeQsw').className  = 'type-btn' + (t==='qsw'  ? ' active-qsw'  : '');
+  $('mopaModalFields').style.display = t === 'mopa' ? '' : 'none';
+  $('qswModalFields').style.display  = t === 'qsw'  ? '' : 'none';
+}
+
+function openModal(laserToEdit) {
+  editingId = laserToEdit?.id || null;
+  $('modalTitle').textContent        = editingId ? 'Edit Custom Laser' : 'Add Custom Laser';
+  $('customName').value              = laserToEdit?.name     || '';
+  $('customWatts').value             = laserToEdit?.watts    || 30;
+  $('customBeam').value              = laserToEdit?.beamDiam || 7;
+  $('modalError').textContent        = '';
+  $('deleteCustomBtn').style.display = editingId ? 'block' : 'none';
+
+  const t = laserToEdit?.type || 'mopa';
+  setModalType(t);
+
+  if (t === 'mopa') {
+    const tb = $('pulseTableBody'); tb.innerHTML = '';
+    (laserToEdit?.pulses || [{ns:100,cutoff:105,maxFreq:1000},{ns:500,cutoff:30,maxFreq:500}])
+      .forEach(r => addTableRow(r.ns, r.cutoff, r.maxFreq));
+  } else {
+    $('qswModalMinFreq').value     = laserToEdit?.minFreq      || 20;
+    $('qswModalMaxFreq').value     = laserToEdit?.maxFreq      || 60;
+    $('qswModalMaxPulseEn').value  = laserToEdit?.maxPulseEnMJ != null ? laserToEdit.maxPulseEnMJ : '';
+    $('qswModalTauMin').value      = laserToEdit?.tauMin       || 80;
+    $('qswModalTauMax').value      = laserToEdit?.tauMax       || 130;
+    // Power interpolation fields — blank if not used
+    $('qswModalWattsA').value = laserToEdit?.wattsAtMinFreq   != null ? laserToEdit.wattsAtMinFreq   : '';
+    $('qswModalFreqA').value  = laserToEdit?.powerInterpMinFreq != null ? laserToEdit.powerInterpMinFreq : '';
+    $('qswModalWattsB').value = laserToEdit?.wattsAtMaxFreq   != null ? laserToEdit.wattsAtMaxFreq   : '';
+    $('qswModalFreqB').value  = laserToEdit?.powerInterpMaxFreq != null ? laserToEdit.powerInterpMaxFreq : '';
+  }
+  $('modalOverlay').classList.add('open');
+}
+
+function addTableRow(ns='',cutoff='',maxFreq='') {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><input type="number" class="pw-ns" value="${ns}" min="1" step="1"></td>
+    <td><input type="number" class="pw-cutoff" value="${cutoff}" min="0.1" step="0.1"></td>
+    <td><input type="number" class="pw-maxf" value="${maxFreq}" min="1" step="1"></td>
+    <td><button class="del-row">✕</button></td>`;
+  tr.querySelector('.del-row').addEventListener('click', () => tr.remove());
+  $('pulseTableBody').appendChild(tr);
+}
+
+function closeModal() { $('modalOverlay').classList.remove('open'); editingId = null; }
+
+function saveCustomLaser() {
+  const name  = $('customName').value.trim();
+  const watts = parseFloat($('customWatts').value);
+  const beam  = parseFloat($('customBeam').value) || 7;
+  const errEl = $('modalError');
+  if (!name)           { errEl.textContent = 'Enter a model name.'; return; }
+  if (!watts||watts<=0){ errEl.textContent = 'Enter a valid wattage.'; return; }
+
+  const id = editingId || ('custom_' + Date.now());
+  let laser;
+
+  if (modalType === 'mopa') {
+    const rows = [...document.querySelectorAll('#pulseTableBody tr')].map(tr => ({
+      ns:      parseInt(tr.querySelector('.pw-ns').value),
+      cutoff:  parseFloat(tr.querySelector('.pw-cutoff').value),
+      maxFreq: parseFloat(tr.querySelector('.pw-maxf').value),
+    })).filter(r => r.ns>0 && r.cutoff>0 && r.maxFreq>0);
+    if (!rows.length) { errEl.textContent = 'Add at least one pulse width row.'; return; }
+    rows.sort((a,b) => a.ns - b.ns);
+    laser = { id, brand: 'Custom', type: 'mopa', name, watts, beamDiam: beam, pulses: rows };
+  } else {
+    const minFreq      = parseFloat($('qswModalMinFreq').value);
+    const maxFreq      = parseFloat($('qswModalMaxFreq').value);
+    const maxPulseEnMJ = parseFloat($('qswModalMaxPulseEn').value) || null;
+    const tauMin       = parseFloat($('qswModalTauMin').value);
+    const tauMax       = parseFloat($('qswModalTauMax').value);
+    if (!minFreq||!maxFreq||minFreq>=maxFreq) { errEl.textContent = 'Min PRF must be less than Max PRF.'; return; }
+    if (!tauMin||!tauMax) { errEl.textContent = 'Enter pulse width limits.'; return; }
+
+    // Optional power interpolation
+    const wattsA = parseFloat($('qswModalWattsA').value);
+    const freqA  = parseFloat($('qswModalFreqA').value);
+    const wattsB = parseFloat($('qswModalWattsB').value);
+    const freqB  = parseFloat($('qswModalFreqB').value);
+    const hasPowerInterp = wattsA > 0 && freqA > 0 && wattsB > 0 && freqB > 0 && freqA !== freqB;
+    if ((wattsA||freqA||wattsB||freqB) && !hasPowerInterp) {
+      errEl.textContent = 'Fill in all four power interpolation fields (or leave all blank).'; return;
+    }
+
+    laser = {
+      id, brand: 'Custom', type: 'qsw', name, watts,
+      beamDiam: beam, minFreq, maxFreq, tauMin, tauMax,
+      ...(maxPulseEnMJ ? { maxPulseEnMJ } : {}),
+      ...(hasPowerInterp ? {
+        wattsAtMinFreq: Math.min(wattsA, wattsB),
+        wattsAtMaxFreq: Math.max(wattsA, wattsB),
+        powerInterpMinFreq: freqA < freqB ? freqA : freqB,
+        powerInterpMaxFreq: freqA < freqB ? freqB : freqA,
+      } : {})
+    };
+  }
+
+  saveCustom([...loadCustom().filter(c => c.id !== id), laser]);
+  closeModal();
+  buildBrandDropdown('Custom');
+  buildModelDropdown(id);
+}
+
+function deleteCustomLaser() {
+  if (!editingId || !confirm('Delete this laser? Cannot be undone.')) return;
+  saveCustom(loadCustom().filter(c => c.id !== editingId));
+  closeModal();
+  buildBrandDropdown('JPT');
+  buildModelDropdown();
+}
+
+$('openModalBtn').addEventListener('click', () => {
+  const existing = loadCustom().find(l => l.id === modelSelect.value);
+  openModal(existing || null);
+});
+$('closeModalBtn').addEventListener('click',   closeModal);
+$('cancelModalBtn').addEventListener('click',  closeModal);
+$('saveCustomBtn').addEventListener('click',   saveCustomLaser);
+$('deleteCustomBtn').addEventListener('click', deleteCustomLaser);
+$('addRowBtn').addEventListener('click',       () => addTableRow());
+$('modalOverlay').addEventListener('click', e => { if (e.target === $('modalOverlay')) closeModal(); });
+
+// ═══════════════════════════════════════════════════════════════
+//  INPUT HIGHLIGHTING
+// ═══════════════════════════════════════════════════════════════
+
+// Maps each readout data-tip key to the field IDs and panel IDs to highlight.
+const HIGHLIGHT_MAP = {
+  watts: {
+    fieldIds: ['freqManual', 'freqSlider', 'powerPercent', 'qswPowerPct'],
+    panelIds: ['panelFreq'],
+  },
+  energy: {
+    fieldIds: ['freqManual', 'freqSlider', 'powerPercent', 'qswPowerPct', 'cutoffFreq'],
+    panelIds: ['panelFreq'],
+    mopaOnly: ['cutoffFreq'],
+  },
+  peak: {
+    fieldIds: ['freqManual', 'freqSlider', 'powerPercent', 'qswPowerPct', 'cutoffFreq', 'pulseSelect', 'qswPulseDisplay'],
+    panelIds: ['panelFreq'],
+    mopaOnly: ['cutoffFreq', 'pulseSelect'],
+    qswOnly:  ['qswPulseDisplay'],
+  },
+  period: {
+    fieldIds: ['freqManual', 'freqSlider'],
+    panelIds: ['panelFreq'],
+  },
+  spot: {
+    fieldIds: ['beamDiam', 'focalLen', 'mSquared'],
+    panelIds: ['panelOptics'],
+  },
+  fluence: {
+    fieldIds: ['beamDiam', 'focalLen', 'mSquared', 'freqManual', 'freqSlider', 'powerPercent', 'qswPowerPct'],
+    panelIds: ['panelOptics', 'panelFreq'],
+  },
+  pulseoverlap: {
+    fieldIds: ['scanSpeed', 'freqManual', 'freqSlider', 'beamDiam', 'focalLen', 'mSquared'],
+    panelIds: ['panelProcess', 'panelFreq', 'panelOptics'],
+  },
+  lineoverlap: {
+    fieldIds: ['lpiVal', 'liVal', 'beamDiam', 'focalLen', 'mSquared'],
+    panelIds: ['panelProcess', 'panelOptics'],
+  },
+};
+
+function getHighlightTarget(id) {
+  const el = $(id);
+  if (!el) return null;
+  // Range slider — highlight the whole slider-section so track + thumb both show
+  if (el.type === 'range') return el.closest('.slider-section') || el.parentElement;
+  // Freq manual number input — inside .freq-manual wrapper
+  if (el.closest('.freq-manual')) return el.closest('.freq-manual');
+  // qswPulseDisplay — a plain div, highlight its .input-wrap parent
+  if (el.classList.contains('qsw-pulse-display')) return el.closest('.input-wrap') || el.parentElement;
+  // Standard number input or select — highlight the .input-wrap
+  return el.closest('.input-wrap') || el.parentElement;
+}
+
+function applyHighlights(tipKey) {
+  clearHighlights();
+  const map = HIGHLIGHT_MAP[tipKey];
+  if (!map) return;
+
+  const laser = getLaser(modelSelect.value);
+  const isQsw = laser && laser.type === 'qsw';
+
+  map.fieldIds.forEach(id => {
+    if (map.mopaOnly && map.mopaOnly.includes(id) && isQsw)  return;
+    if (map.qswOnly  && map.qswOnly.includes(id)  && !isQsw) return;
+    const target = getHighlightTarget(id);
+    if (target) target.classList.add('input-highlight');
+  });
+
+  (map.panelIds || []).forEach(id => {
+    const el = $(id);
+    if (el) el.classList.add('panel-highlight');
+  });
+}
+
+function clearHighlights() {
+  document.querySelectorAll('.input-highlight').forEach(el => el.classList.remove('input-highlight'));
+  document.querySelectorAll('.panel-highlight').forEach(el => el.classList.remove('panel-highlight'));
+}
+
+// Wire up readout hover — use mouseenter/mouseleave on the readout divs
+document.querySelectorAll('.readout[data-outputs]').forEach(r => {
+  r.addEventListener('mouseenter', () => applyHighlights(r.dataset.outputs));
+  r.addEventListener('mouseleave', clearHighlights);
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  TOOLTIPS
+// ═══════════════════════════════════════════════════════════════
+
+const TOOLTIPS = {
+  watts:   { desc: 'Actual average power being delivered at the current settings. Below cutoff, avg power scales linearly with frequency (P = E_pulse × f) while pulse energy and peak power remain constant — this is correct MOPA behaviour, not a bug.',
+             formula: 'P_avg = f × E_pulse  (below cutoff, MOPA)\nP_avg = P_rated × power%  (Q-switched)' },
+  energy:  { desc: 'Energy delivered per individual pulse. For MOPA below cutoff, pulse energy is fixed at the spec max (E = P_rated ÷ f_cutoff) — it does NOT decrease as frequency drops. This is the defining characteristic of MOPA operation. Above cutoff, energy decreases as frequency rises.',
+             formula: 'E_pulse = P_avg ÷ f' },
+  peak:    { desc: 'Instantaneous power during a pulse. For MOPA below cutoff, peak power is constant regardless of frequency — E/pulse is fixed at the spec max, so peak = E/τ stays the same. Peak only decreases above cutoff as pulse energy is divided across more pulses.',
+             formula: 'Peak = E_pulse ÷ pulse_width' },
+  period:  { desc: 'Time between the start of one pulse and the next. At higher frequencies pulses arrive closer together.',
+             formula: 'T = 1 ÷ f' },
+  spot:    { desc: 'Calculated 1/e² focused beam diameter at the focal point using the Gaussian beam formula.',
+             formula: 'd = M² × (4 × λ × f_len) ÷ (π × D_beam)' },
+  fluence: { desc: 'Energy per unit area per pulse. The primary parameter governing material interaction. Too low = no effect. Too high = damage.',
+             formula: 'H = E_pulse ÷ spot_area' },
+  pulseoverlap: { desc: 'How much consecutive pulses overlap (or gap) along the scan direction. Overlap means each spot partially covers the previous one. Gap means there are unprocessed areas between pulses. 60–80% overlap is common for marking; deeper engraving often higher.',
+                  formula: 'overlap% = (1 - pulse_spacing ÷ spot_diameter) × 100\npulse_spacing = speed ÷ frequency' },
+  lineoverlap:  { desc: 'How much adjacent scan lines overlap (or gap) perpendicular to the scan direction. Determined by your LPI or line interval setting relative to the focused spot size.',
+                  formula: 'overlap% = (1 - line_interval ÷ spot_diameter) × 100\nline_interval = 25.4 ÷ LPI' },
+};
+
+function fmt(val, digits) { return val != null ? val.toFixed(digits) : '—'; }
+function fmtEJ(j) { // compact energy display for tooltip
+  if (!j || j <= 0) return '—';
+  if (j < 1e-6) return (j*1e9).toFixed(3) + ' nJ';
+  if (j < 1e-3) return (j*1e6).toFixed(3) + ' μJ';
+  if (j < 1)    return (j*1e3).toFixed(4) + ' mJ';
+  return j.toFixed(4) + ' J';
+}
+function fmtW(w) {
+  if (!w || w <= 0) return '—';
+  if (w >= 1e6) return (w/1e6).toFixed(3) + ' MW';
+  if (w >= 1e3) return (w/1e3).toFixed(3) + ' kW';
+  return w.toFixed(2) + ' W';
+}
+
+function getLiveValues(key) {
+  const L = LIVE;
+  const f_hz = L.setFreqKHz * 1000;
+  switch (key) {
+    case 'watts':
+      return `${fmt(L.outputWatts, 2)} W = ${fmt(L.setFreqKHz, 1)} kHz × ${fmtEJ(L.effectivePulseEnJ)}`;
+    case 'energy':
+      return `${fmtEJ(L.effectivePulseEnJ)} = ${fmt(L.outputWatts, 2)} W ÷ ${fmt(L.setFreqKHz, 1)} kHz`;
+    case 'peak':
+      return `${fmtW(L.effectivePeakW)} = ${fmtEJ(L.effectivePulseEnJ)} ÷ ${fmt(L.pulseDurNs, 1)} ns`;
+    case 'period':
+      return `${f_hz > 0 ? (1e6/f_hz).toFixed(3) : '—'} μs = 1 ÷ ${fmt(L.setFreqKHz, 1)} kHz`;
+    case 'spot':
+      if (!L.spotDiamUm) return 'Enter beam diameter and focal length';
+      const spotStr = L.spotDiamUm < 1
+        ? (L.spotDiamUm*1000).toFixed(1) + ' nm'
+        : L.spotDiamUm.toFixed(1) + ' μm';
+      return `${spotStr} = ${fmt(L.mSq,2)} × (4 × 1064nm × ${fmt(L.focalLenMm,0)}mm) ÷ (π × ${fmt(L.beamDiamMm,1)}mm)`;
+    case 'fluence':
+      if (!L.fluenceJcm2) return 'Enter beam diameter and focal length';
+      const flu = L.fluenceJcm2 >= 1
+        ? fmt(L.fluenceJcm2, 3) + ' J/cm²'
+        : (L.fluenceJcm2*1000).toFixed(3) + ' mJ/cm²';
+      return `${flu} = ${fmtEJ(L.effectivePulseEnJ)} ÷ ${(L.spotAreaCm2*1e4).toFixed(4)} mm²`;
+    case 'pulseoverlap':
+      if (!L.spotDiamUm || !L.pulseSpacMm) return 'Set speed, frequency, and beam optics';
+      const spotMmP = (L.spotDiamUm/1000).toFixed(4);
+      const pct = L.pulseOverlapPct != null ? L.pulseOverlapPct.toFixed(1) : '—';
+      return `${pct}% = (1 - ${fmt(L.pulseSpacMm,4)}mm ÷ ${spotMmP}mm) × 100\nspacing: ${fmt(L.speedMmS,1)} mm/s ÷ ${fmt(L.setFreqKHz*1000,0)} Hz`;
+    case 'lineoverlap':
+      if (!L.spotDiamUm || !L.lineIntMm) return 'Set line interval/LPI and beam optics';
+      const spotMmL = (L.spotDiamUm/1000).toFixed(4);
+      const lpct = L.lineOverlapPct != null ? L.lineOverlapPct.toFixed(1) : '—';
+      return `${lpct}% = (1 - ${fmt(L.lineIntMm,4)}mm ÷ ${spotMmL}mm) × 100`;
+    default: return '';
+  }
+}
+
+function buildTipHTML(key) {
+  const tip = TOOLTIPS[key];
+  if (!tip) return '';
+  const live = getLiveValues(key);
+  return `<div class="tip-desc">${tip.desc}</div>` +
+         `<div class="tip-sep"></div>` +
+         `<div class="tip-formula"><span>Formula:</span> ${tip.formula.replace(/\n/g,'<br>')}</div>` +
+         `<div class="tip-sep"></div>` +
+         `<div class="tip-live">${live}</div>`;
+}
+
+const tooltip = $('tooltip');
+
+function showTooltip(key, e) {
+  if (!TOOLTIPS[key]) return;
+  tooltip.innerHTML = buildTipHTML(key);
+  tooltip.dataset.activeKey = key;
+  tooltip.classList.add('visible');
+  positionTooltip(e);
+}
+
+document.querySelectorAll('.tip-btn').forEach(btn => {
+  btn.addEventListener('mouseenter', e => { showTooltip(btn.dataset.tip, e); });
+  btn.addEventListener('mousemove',  positionTooltip);
+  btn.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const key = btn.dataset.tip;
+    const isVisible = tooltip.classList.contains('visible') && tooltip.dataset.activeKey === key;
+    tooltip.classList.remove('visible');
+    if (!isVisible) showTooltip(key, e);
+  });
+});
+
+function positionTooltip(e) {
+  const margin = 12;
+  const tw = tooltip.offsetWidth || 280;
+  const th = tooltip.offsetHeight || 100;
+  let x = e.clientX + margin;
+  let y = e.clientY + margin;
+  if (x + tw > window.innerWidth  - margin) x = e.clientX - tw - margin;
+  if (y + th > window.innerHeight - margin) y = e.clientY - th - margin;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top  = y + 'px';
+}
+
+// Close on outside click (mobile)
+document.addEventListener('click', () => tooltip.classList.remove('visible'));
+
+// ═══════════════════════════════════════════════════════════════
+//  DISPLAY SETTINGS
+// ═══════════════════════════════════════════════════════════════
+
+// Small = current default, Medium = bigger, Large = biggest
+const FONT_SIZES = { small: '15px', med: '18px', large: '22px' };
+const STRETCH_FONT = '17px'; // base font when stretch is on (overridden by explicit font size)
+
+function loadDisplaySettings() {
+  try { return JSON.parse(localStorage.getItem('displaySettings') || '{}'); } catch { return {}; }
+}
+function saveDisplaySettings(obj) {
+  try { localStorage.setItem('displaySettings', JSON.stringify({...loadDisplaySettings(), ...obj})); } catch {}
+}
+
+function applyTheme(light) {
+  document.body.classList.toggle('light', light);
+  $('themeToggle').checked = light;
+}
+
+function applyStretch(stretch, currentFontSize) {
+  document.body.classList.toggle('stretch', stretch);
+  $('stretchToggle').checked = stretch;
+  // When stretch is on, bump font slightly unless user has explicitly picked a size
+  const size = currentFontSize || loadDisplaySettings().fontSize || 'small';
+  const base = FONT_SIZES[size];
+  // stretch adds 2px on top of chosen font size
+  if (stretch) {
+    const px = parseInt(base) + 2;
+    document.documentElement.style.fontSize = px + 'px';
+  } else {
+    document.documentElement.style.fontSize = base;
+  }
+}
+
+function applyFontSize(size) {
+  const stretch = loadDisplaySettings().stretch || false;
+  const px = stretch ? (parseInt(FONT_SIZES[size]) + 2) : parseInt(FONT_SIZES[size]);
+  document.documentElement.style.fontSize = px + 'px';
+  ['fontSmall','fontMed','fontLarge'].forEach(id => $(id).classList.remove('active'));
+  const capKey = size.charAt(0).toUpperCase() + size.slice(1);
+  $('font' + capKey).classList.add('active');
+}
+
+// Popover toggle
+$('dsBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  const pop = $('dsPopover');
+  const btn = $('dsBtn');
+  const isOpen = pop.classList.contains('open');
+
+  if (!isOpen) {
+    // Position below the button
+    const rect = btn.getBoundingClientRect();
+    pop.style.top  = (rect.bottom + window.scrollY + 6) + 'px';
+    pop.style.left = rect.left + 'px';
+  }
+
+  pop.classList.toggle('open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+});
+
+// Close popover on outside click
+document.addEventListener('click', e => {
+  if (!$('dsPopover').contains(e.target) && e.target !== $('dsBtn')) {
+    $('dsPopover').classList.remove('open');
+    $('dsBtn').classList.remove('open');
+  }
+});
+
+$('themeToggle').addEventListener('change', e => {
+  applyTheme(e.target.checked);
+  saveDisplaySettings({ light: e.target.checked });
+});
+
+$('stretchToggle').addEventListener('change', e => {
+  applyStretch(e.target.checked);
+  saveDisplaySettings({ stretch: e.target.checked });
+});
+
+['Small','Med','Large'].forEach(s => {
+  $('font' + s).addEventListener('click', () => {
+    const key = s.toLowerCase();
+    applyFontSize(key);
+    saveDisplaySettings({ fontSize: key });
+  });
+});
+
+// Update slider fill as it moves
+document.querySelectorAll('input[type="range"]').forEach(slider => {
+  const update = () => {
+    const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+    slider.style.setProperty('--pct', pct + '%');
+  };
+  slider.addEventListener('input', update);
+  update();
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  TAB SWITCHING
+// ═══════════════════════════════════════════════════════════════
+$('tabCalc').addEventListener('click', () => {
+  $('tabCalc').classList.add('active');
+  $('tabConv').classList.remove('active');
+  $('contentCalc').classList.add('active');
+  $('contentConv').classList.remove('active');
+});
+$('tabConv').addEventListener('click', () => {
+  $('tabConv').classList.add('active');
+  $('tabCalc').classList.remove('active');
+  $('contentConv').classList.add('active');
+  $('contentCalc').classList.remove('active');
+  convPrePopulateDestination();
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+//  CONVERTER
+// ═══════════════════════════════════════════════════════════════
+
+const LAMBDA_M_CONV = 1064e-9;
+let srcUseLPI = true;
+let convAltSolutions = [];
+
+// ── Converter dropdowns ────────────────────────────────────────
+function convBuildBrandDropdown(selectId, placeholder) {
+  const sel = $(selectId);
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  BRAND_ORDER.forEach(brand => {
+    if (allLasers().some(l => l.brand === brand)) {
+      const opt = document.createElement('option');
+      opt.value = brand; opt.textContent = brand;
+      sel.appendChild(opt);
+    }
+  });
+}
+
+function convBuildModelDropdown(brandSelId, modelSelId, placeholder) {
+  const brand = $(brandSelId).value;
+  const sel   = $(modelSelId);
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  if (!brand) return;
+  allLasers().filter(l => l.brand === brand).forEach(l => {
+    const opt = document.createElement('option');
+    opt.value = l.id; opt.textContent = l.name;
+    sel.appendChild(opt);
+  });
+}
+
+function convUpdateBadge(laser, badgeId) {
+  const el = $(badgeId);
+  if (!laser) { el.innerHTML = '&nbsp;'; return; }
+  const typeLabel = laser.type === 'mopa'
+    ? '<span class="type-badge mopa">MOPA</span>'
+    : '<span class="type-badge qsw">Q-SW</span>';
+  el.innerHTML = `${typeLabel} <span>${laser.watts}W</span> · beam <span>${laser.beamDiam}mm</span> · M² <span>${laser.mSquared}</span>`;
+}
+
+// Source brand/model
+$('srcBrandSelect').addEventListener('change', () => {
+  convBuildModelDropdown('srcBrandSelect', 'srcModelSelect', 'Select Model');
+  $('srcModelBadge').innerHTML = '&nbsp;';
+  srcUpdatePulseDropdown();
+  convCalculateSourceTargets();
+  updateSolveBtn();
+});
+$('srcModelSelect').addEventListener('change', () => {
+  const laser = getLaser($('srcModelSelect').value);
+  convUpdateBadge(laser, 'srcModelBadge');
+  srcUpdatePulseDropdown();
+  convCalculateSourceTargets();
+  updateSolveBtn();
+});
+
+// Source pulse width dropdown (MOPA only)
+function srcUpdatePulseDropdown() {
+  const laser = getLaser($('srcModelSelect').value);
+  const field = $('srcPulseField');
+  const sel   = $('srcPulseSelect');
+  if (laser && laser.type === 'mopa' && laser.pulses) {
+    field.style.display = '';
+    sel.innerHTML = '';
+    laser.pulses.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.ns; opt.textContent = p.ns + ' ns';
+      sel.appendChild(opt);
+    });
+    // Default to 100ns if available, else first
+    const prefer = [100, 200, 50];
+    for (const ns of prefer) {
+      const match = [...sel.options].find(o => parseInt(o.value) === ns);
+      if (match) { sel.value = match.value; break; }
+    }
+  } else {
+    field.style.display = 'none';
+  }
+}
+$('srcPulseSelect').addEventListener('change', convCalculateSourceTargets);
+
+// Destination brand/model
+$('dstBrandSelect').addEventListener('change', () => {
+  convBuildModelDropdown('dstBrandSelect', 'dstModelSelect', 'Select Model');
+  $('dstModelBadge').innerHTML = '&nbsp;';
+  dstUpdatePulseOverride();
+  updateSolveBtn();
+});
+$('dstModelSelect').addEventListener('change', () => {
+  const laser = getLaser($('dstModelSelect').value);
+  convUpdateBadge(laser, 'dstModelBadge');
+  dstUpdatePulseOverride();
+  updateSolveBtn();
+});
+
+function dstUpdatePulseOverride() {
+  const laser = getLaser($('dstModelSelect').value);
+  const sel   = $('dstPulseOverride');
+  sel.innerHTML = '';
+  if (laser && laser.type === 'mopa' && laser.pulses) {
+    $('pwOverrideCheck').disabled = false;
+    laser.pulses.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.ns; opt.textContent = p.ns + ' ns';
+      sel.appendChild(opt);
+    });
+  } else {
+    $('pwOverrideCheck').checked = false;
+    $('pwOverrideField').style.display = 'none';
+    $('pwOverrideCheck').disabled = true;
+  }
+}
+
+$('pwOverrideCheck').addEventListener('change', e => {
+  $('pwOverrideField').style.display = e.target.checked ? '' : 'none';
+});
+
+// Source LPI/LI toggle
+$('srcBtnLPI').addEventListener('click', () => {
+  if (srcUseLPI) return;
+  const liMm = parseFloat($('srcLI').value);
+  if (liMm > 0) $('srcLI').value = (25.4 / liMm).toFixed(4);
+  srcUseLPI = true;
+  $('srcBtnLPI').classList.add('active'); $('srcBtnLI').classList.remove('active');
+  $('srcLILabel').textContent = 'LPI'; $('srcLIUnit').textContent = 'lpi';
+  $('srcLI').placeholder = 'lpi';
+  convCalculateSourceTargets();
+});
+$('srcBtnLI').addEventListener('click', () => {
+  if (!srcUseLPI) return;
+  const lpi = parseFloat($('srcLI').value);
+  if (lpi > 0) $('srcLI').value = (25.4 / lpi).toFixed(4);
+  srcUseLPI = false;
+  $('srcBtnLI').classList.add('active'); $('srcBtnLPI').classList.remove('active');
+  $('srcLILabel').textContent = 'Line Interval'; $('srcLIUnit').textContent = 'mm';
+  $('srcLI').placeholder = 'mm';
+  convCalculateSourceTargets();
+});
+
+// Recalculate source targets on any input change
+['srcFocalLen','srcMSquared','srcFreq','srcPower','srcSpeed','srcLI'].forEach(id =>
+  $(id).addEventListener('input', convCalculateSourceTargets)
+);
+
+function updateSolveBtn() {
+  const srcOk = !!getLaser($('srcModelSelect').value);
+  const dstOk = !!getLaser($('dstModelSelect').value);
+  $('solveBtn').disabled = !(srcOk && dstOk);
+}
+
+// ── Source target calculations ─────────────────────────────────
+function convCalcSpot(focalMm, beamMm, mSq) {
+  if (!focalMm || !beamMm) return 0;
+  return mSq * (4 * LAMBDA_M_CONV * focalMm * 1e-3) / (Math.PI * beamMm * 1e-3) * 1e6; // μm
+}
+
+function convCalcPulseEnergy(laser, freqKHz, powerPct, pulseNs) {
+  // Returns { pulseEnJ, outputW, pulseDurNs, clamped }
+  const freqHz = freqKHz * 1000;
+  const pwr    = powerPct / 100;
+  let pulseEnJ = 0, outputW = 0, pulseDurNs = pulseNs || 0, clamped = false;
+
+  if (laser.type === 'mopa') {
+    const row = laser.pulses && laser.pulses.find(p => p.ns === parseInt(pulseNs));
+    if (!row) return null;
+    pulseDurNs      = row.ns;
+    const cutoffHz  = row.cutoff * 1000;
+    const maxEnJ    = laser.watts / cutoffHz;
+    const scaledMaxEnJ = maxEnJ * pwr;
+    if (freqHz <= cutoffHz) {
+      pulseEnJ = scaledMaxEnJ;
+      outputW  = pulseEnJ * freqHz;
+    } else {
+      outputW  = laser.watts * pwr;
+      pulseEnJ = outputW / freqHz;
+    }
+    const specMaxEnJ = laser.maxPulseEnMJ != null ? laser.maxPulseEnMJ * 1e-3 : Infinity;
+    if (pulseEnJ > specMaxEnJ) { pulseEnJ = specMaxEnJ; outputW = pulseEnJ * freqHz; clamped = true; }
+  } else {
+    // Q-switched
+    const t = (freqKHz - laser.minFreq) / (laser.maxFreq - laser.minFreq);
+    pulseDurNs = laser.tauMin + Math.max(0, Math.min(1, t)) * (laser.tauMax - laser.tauMin);
+    let laserW = laser.watts;
+    if (laser.wattsAtMinFreq != null) {
+      const pt = Math.max(0, Math.min(1, (freqKHz - laser.powerInterpMinFreq) / (laser.powerInterpMaxFreq - laser.powerInterpMinFreq)));
+      laserW = laser.wattsAtMinFreq + pt * (laser.wattsAtMaxFreq - laser.wattsAtMinFreq);
+    }
+    const uncappedEnJ = laserW * pwr / freqHz;
+    const specMaxEnJ  = laser.maxPulseEnMJ != null ? laser.maxPulseEnMJ * 1e-3 : Infinity;
+    pulseEnJ = Math.min(uncappedEnJ, specMaxEnJ);
+    if (pulseEnJ < uncappedEnJ) clamped = true;
+    outputW = pulseEnJ * freqHz;
+  }
+  return { pulseEnJ, outputW, pulseDurNs, clamped };
+}
+
+function convCalculateSourceTargets() {
+  const laser    = getLaser($('srcModelSelect').value);
+  const freqKHz  = parseFloat($('srcFreq').value) || 0;
+  const powerPct = parseFloat($('srcPower').value) || 0;
+  const focalMm  = parseFloat($('srcFocalLen').value) || 0;
+  const mSq      = parseFloat($('srcMSquared').value) || 1.5;
+  const speedMmS = parseFloat($('srcSpeed').value) || 0;
+  const liRaw    = parseFloat($('srcLI').value) || 0;
+  const lineIntMm = srcUseLPI ? (liRaw > 0 ? 25.4 / liRaw : 0) : liRaw;
+  const pulseNs  = laser && laser.type === 'mopa' ? parseInt($('srcPulseSelect').value) : null;
+
+  function setVal(id, val) { $(id).textContent = val; $(id).className = 'target-val match-none'; }
+
+  if (!laser || !freqKHz || !powerPct) {
+    ['src-fluence','src-energy','src-peak','src-poverlap','src-loverlap','src-spot'].forEach(id => setVal(id, '—'));
+    return;
+  }
+
+  const res = convCalcPulseEnergy(laser, freqKHz, powerPct, pulseNs);
+  if (!res) { ['src-fluence','src-energy','src-peak','src-poverlap','src-loverlap','src-spot'].forEach(id => setVal(id, '—')); return; }
+
+  const spotUm     = convCalcSpot(focalMm, laser.beamDiam, mSq);
+  const spotMm     = spotUm / 1000;
+  const spotAreaCm2 = spotMm > 0 ? Math.PI * Math.pow((spotMm/2)*10, 2) : 0;
+  const fluence    = spotAreaCm2 > 0 ? res.pulseEnJ / spotAreaCm2 : 0;
+  const peakW      = res.pulseDurNs > 0 ? res.pulseEnJ / (res.pulseDurNs * 1e-9) : 0;
+  const pulseSpacMm = freqKHz > 0 && speedMmS > 0 ? speedMmS / (freqKHz * 1000) : 0;
+  const pulseOvPct  = spotMm > 0 && pulseSpacMm > 0 ? (1 - pulseSpacMm / spotMm) * 100 : null;
+  const lineOvPct   = spotMm > 0 && lineIntMm > 0   ? (1 - lineIntMm / spotMm) * 100 : null;
+
+  // Format helpers
+  const fmtFlu = v => v >= 1 ? v.toFixed(3)+' J/cm²' : (v*1000).toFixed(3)+' mJ/cm²';
+  const fmtEn  = v => v < 1e-3 ? (v*1e6).toFixed(3)+' μJ' : (v*1e3).toFixed(4)+' mJ';
+  const fmtPk  = v => v >= 1e3 ? (v/1e3).toFixed(3)+' kW' : v.toFixed(1)+' W';
+  const fmtOv  = v => v == null ? '—' : (v >= 0 ? v.toFixed(1)+'% ovlp' : Math.abs(v).toFixed(1)+'% gap');
+
+  $('src-fluence').textContent  = fluence > 0 ? fmtFlu(fluence) : '—';
+  $('src-energy').textContent   = fmtEn(res.pulseEnJ);
+  $('src-peak').textContent     = fmtPk(peakW);
+  $('src-poverlap').textContent = fmtOv(pulseOvPct);
+  $('src-loverlap').textContent = fmtOv(lineOvPct);
+  $('src-spot').textContent     = spotUm > 0 ? spotUm.toFixed(1)+' μm' : '—';
+
+  // Effective average power at material
+  const effW = res.outputW;
+  $('src-effpower').textContent = effW.toFixed(2) + ' W  (E_pulse × f = ' + fmtEn(res.pulseEnJ) + ' × ' + freqKHz.toFixed(1) + ' kHz)';
+  $('src-effpower-row').style.display = '';
+
+  // Store for solver
+  window._srcTargets = { fluence, pulseEnJ: res.pulseEnJ, peakW, pulseDurNs: res.pulseDurNs,
+    pulseOvPct, lineOvPct, spotUm, speedMmS, lineIntMm, freqKHz, powerPct,
+    outputWatts: res.outputW };
+}
+
+// ── Solver ─────────────────────────────────────────────────────
+// Pulse width priority when source is Q-switched (or unknown) → MOPA destination
+const QSW_TO_MOPA_PW_PRIORITY = [200, 100, 150, 80, 60, 45, 30, 20, 13, 9, 6, 4, 2, 250, 350, 500];
+
+// Build destination pulse width list based on source type and source pulse width
+function buildPulseWidthList(srcLaser, dstLaser, fixedPulseNs) {
+  if (dstLaser.type !== 'mopa') return [null]; // Q-switched: freq-derived
+  if (fixedPulseNs != null) return [fixedPulseNs]; // user override
+
+  const avail = dstLaser.pulses.map(p => p.ns);
+
+  if (srcLaser && srcLaser.type === 'mopa') {
+    // MOPA → MOPA: start at source pulse width, radiate outward
+    const srcNs = parseInt(window._srcPulseNs) || 100;
+    // Sort available by distance from source pulse width
+    return [...avail].sort((a, b) => Math.abs(a - srcNs) - Math.abs(b - srcNs));
+  } else {
+    // Q-switched → MOPA: use 200/100ns priority, then sweep rest
+    return [...QSW_TO_MOPA_PW_PRIORITY.filter(ns => avail.includes(ns)),
+            ...avail.filter(ns => !QSW_TO_MOPA_PW_PRIORITY.includes(ns))];
+  }
+}
+
+// Scoring weights — different priorities for alt solutions
+// pw weight: high for MOPA→MOPA (match source pulse width), 0 for Q-SW→MOPA
+function getScoreWeights(srcLaser, preset) {
+  const isMopaToMopa = srcLaser && srcLaser.type === 'mopa';
+  const pwWeight = isMopaToMopa ? 2 : 0;
+  const presets = {
+    fluence:  { flu: 4, en: 3, pOv: 1, lOv: 1, pw: pwWeight },
+    overlap:  { flu: 1, en: 1, pOv: 4, lOv: 4, pw: pwWeight },
+    balanced: { flu: 2, en: 2, pOv: 2, lOv: 2, pw: pwWeight },
+  };
+  return presets[preset] || presets.balanced;
+}
+
+// Keep SCORE_WEIGHTS as fallback for cases without srcLaser context
+const SCORE_WEIGHTS = {
+  fluence:  { flu: 4, en: 3, pOv: 1, lOv: 1, pw: 0 },
+  overlap:  { flu: 1, en: 1, pOv: 4, lOv: 4, pw: 0 },
+  balanced: { flu: 2, en: 2, pOv: 2, lOv: 2, pw: 0 },
+};
+
+function solveForLaser(dstLaser, dstFocalMm, dstMSq, targets, fixedPulseNs, weights) {
+  const w = weights || SCORE_WEIGHTS.balanced;
+  const spotUm      = convCalcSpot(dstFocalMm, dstLaser.beamDiam, dstMSq);
+  const spotMm      = spotUm / 1000;
+  const spotAreaCm2 = spotMm > 0 ? Math.PI * Math.pow((spotMm/2)*10, 2) : 0;
+  if (spotMm <= 0) return null;
+
+  const targetFluence = targets.fluence;
+  const targetEnJ     = targets.pulseEnJ;
+
+  const srcLaser  = getLaser($('srcModelSelect').value);
+  const pulseWidths = buildPulseWidthList(srcLaser, dstLaser, fixedPulseNs);
+
+  let bestSolution = null;
+  let bestScore = Infinity;
+
+  for (const pw of pulseWidths) {
+    const minF = dstLaser.type === 'mopa' ? 1 : dstLaser.minFreq;
+    const maxF = dstLaser.type === 'mopa'
+      ? (dstLaser.pulses.find(p => p.ns === pw)?.maxFreq || 4000)
+      : dstLaser.maxFreq;
+
+    const steps = 200;
+    for (let i = 0; i <= steps; i++) {
+      const freqKHz = minF + (maxF - minF) * (i / steps);
+      const freqHz  = freqKHz * 1000;
+
+      let bestPower = null, bestPulseEnJ = null, bestPulseDurNs = null;
+
+      if (dstLaser.type === 'mopa') {
+        const row = dstLaser.pulses.find(p => p.ns === pw);
+        if (!row) continue;
+        const cutoffHz  = row.cutoff * 1000;
+        const maxEnJ    = dstLaser.watts / cutoffHz;
+        const specMax   = dstLaser.maxPulseEnMJ != null ? dstLaser.maxPulseEnMJ * 1e-3 : Infinity;
+        const effMax    = Math.min(maxEnJ, specMax);
+        let pulseEnJ, power;
+        if (freqHz <= cutoffHz) {
+          power    = targetEnJ / maxEnJ * 100;
+          pulseEnJ = Math.min(targetEnJ, effMax);
+        } else {
+          power    = (targetEnJ * freqHz) / dstLaser.watts * 100;
+          pulseEnJ = targetEnJ;
+        }
+        power = Math.max(1, Math.min(100, power));
+        const res = convCalcPulseEnergy(dstLaser, freqKHz, power, pw);
+        if (!res) continue;
+        bestPower = power; bestPulseEnJ = res.pulseEnJ; bestPulseDurNs = res.pulseDurNs;
+      } else {
+        const res100 = convCalcPulseEnergy(dstLaser, freqKHz, 100, null);
+        if (!res100) continue;
+        const power = Math.max(1, Math.min(100, (targetEnJ / res100.pulseEnJ) * 100));
+        const res   = convCalcPulseEnergy(dstLaser, freqKHz, power, null);
+        if (!res) continue;
+        bestPower = power; bestPulseEnJ = res.pulseEnJ; bestPulseDurNs = res.pulseDurNs;
+      }
+
+      const actualFluence = spotAreaCm2 > 0 ? bestPulseEnJ / spotAreaCm2 : 0;
+      const actualPeakW   = bestPulseDurNs > 0 ? bestPulseEnJ / (bestPulseDurNs * 1e-9) : 0;
+
+      // Solve speed and lineInt from overlap targets
+      let speed   = targets.speedMmS   || 500;
+      let lineInt = targets.lineIntMm  || 0;
+      if (targets.pulseOvPct != null) {
+        const targetSpacing = spotMm * (1 - targets.pulseOvPct / 100);
+        speed = Math.max(1, targetSpacing * freqHz);
+      }
+      if (targets.lineOvPct != null) {
+        lineInt = Math.max(0.001, spotMm * (1 - targets.lineOvPct / 100));
+      }
+
+      const pulseSpac    = speed / freqHz;
+      const actualPOvPct = (1 - pulseSpac / spotMm) * 100;
+      const actualLOvPct = lineInt > 0 ? (1 - lineInt / spotMm) * 100 : null;
+
+      // Weighted score — also penalize frequency far from source, unrealistic speed, and pulse width deviation
+      const errFlu  = Math.abs((actualFluence - targetFluence) / (targetFluence || 1));
+      const errEn   = Math.abs((bestPulseEnJ  - targetEnJ)     / (targetEnJ     || 1));
+      const errPOv  = targets.pulseOvPct != null ? Math.abs((actualPOvPct - targets.pulseOvPct) / (Math.abs(targets.pulseOvPct) || 1)) : 0;
+      const errLOv  = targets.lineOvPct != null && actualLOvPct != null ? Math.abs((actualLOvPct - targets.lineOvPct) / (Math.abs(targets.lineOvPct) || 1)) : 0;
+      // Penalize frequency far from source
+      const srcFreqKHz  = targets.freqKHz || freqKHz;
+      const errFreq     = Math.abs((freqKHz - srcFreqKHz) / (srcFreqKHz || 1)) * 0.5;
+      // Penalize unrealistically low speeds
+      const speedPenalty = speed < 10 ? (10 - speed) / 10 * 2 : 0;
+      // Penalize pulse width deviation — strongly prefer matching source pulse width on MOPA→MOPA
+      let pwPenalty = 0;
+      if (pw != null && targets.pulseDurNs) {
+        pwPenalty = Math.abs((pw - targets.pulseDurNs) / (targets.pulseDurNs || 1)) * w.pw;
+      }
+      const score = errFlu * w.flu + errEn * w.en + errPOv * w.pOv + errLOv * w.lOv + errFreq + speedPenalty + pwPenalty;
+
+      if (score < bestScore) {
+        bestScore = score;
+        bestSolution = {
+          freqKHz, power: bestPower, pulseNs: pw, speed,
+          lineInt, spotUm, actualFluence, actualPeakW,
+          pulseEnJ: bestPulseEnJ, pulseDurNs: bestPulseDurNs,
+          actualPOvPct, actualLOvPct,
+          errFlu, errEn, score,
+        };
+      }
+    }
+  }
+  return bestSolution;
+}
+
+function calcConfidence(sol) {
+  // Exponential decay: confidence = 100 × e^(-score × 2)
+  // score 0   → 100%, score 0.35 → 50%, score 1.0 → 14%
+  return Math.round(100 * Math.exp(-sol.score * 2));
+}
+
+function confidenceColor(pct) {
+  if (pct >= 80) return 'var(--green)';
+  if (pct >= 50) return 'var(--amber)';
+  return 'var(--red)';
+}
+
+function matchBadge(err) {
+  if (err <= 0.05) return '<span class="match-badge good">✓ &lt;5%</span>';
+  if (err <= 0.20) return '<span class="match-badge warn">⚠ &lt;20%</span>';
+  return '<span class="match-badge fail">✗ &gt;20%</span>';
+}
+
+function renderSolution(sol, targets) {
+  if (!sol) return '<div class="small-note" style="color:var(--red);margin-top:8px">No solution found for this laser at these targets.</div>';
+
+  const fmtFlu = v => v >= 1 ? v.toFixed(3)+' J/cm²' : (v*1000).toFixed(3)+' mJ/cm²';
+  const fmtEn  = v => v < 1e-3 ? (v*1e6).toFixed(3)+' μJ' : (v*1e3).toFixed(4)+' mJ';
+  const fmtPk  = v => v >= 1e3 ? (v/1e3).toFixed(3)+' kW' : v.toFixed(1)+' W';
+  const fmtOv  = v => v == null ? '—' : (v >= 0 ? v.toFixed(1)+'% overlap' : Math.abs(v).toFixed(1)+'% gap');
+
+  const errPOv = targets.pulseOvPct != null ? Math.abs((sol.actualPOvPct - targets.pulseOvPct) / (Math.abs(targets.pulseOvPct)||1)) : 0;
+  const errLOv = targets.lineOvPct != null && sol.actualLOvPct != null ? Math.abs((sol.actualLOvPct - targets.lineOvPct) / (Math.abs(targets.lineOvPct)||1)) : 0;
+  const errPk  = Math.abs((sol.actualPeakW - targets.peakW) / (targets.peakW||1));
+
+  const conf      = calcConfidence(sol);
+  const confColor = confidenceColor(conf);
+  const confLabel = conf >= 80 ? 'Good match' : conf >= 50 ? 'Approximate match' : 'Poor match — review manually';
+
+  return `
+    <div class="conf-row" style="margin-bottom:12px">
+      <div class="conf-label">Match Confidence</div>
+      <div class="conf-bar-wrap">
+        <div class="conf-bar" style="width:${conf}%;background:${confColor}"></div>
+      </div>
+      <div class="conf-pct" style="color:${confColor}">${conf}%</div>
+      <div class="conf-note">${confLabel}</div>
+    </div>
+    <div class="target-grid" style="margin-bottom:1px">
+      <div><div class="target-header">Parameter</div></div>
+      <div><div class="target-header">Target</div></div>
+      <div><div class="target-header">Result</div></div>
+    </div>
+    <div class="target-grid">
+      <div><div class="target-header">Fluence</div></div>
+      <div><div class="target-val">${fmtFlu(targets.fluence)}</div></div>
+      <div><div class="target-val ${sol.errFlu<=0.05?'match-good':sol.errFlu<=0.2?'match-warn':'match-fail'}">${fmtFlu(sol.actualFluence)}${matchBadge(sol.errFlu)}</div></div>
+      <div><div class="target-header">Pulse Energy</div></div>
+      <div><div class="target-val">${fmtEn(targets.pulseEnJ)}</div></div>
+      <div><div class="target-val ${sol.errEn<=0.05?'match-good':sol.errEn<=0.2?'match-warn':'match-fail'}">${fmtEn(sol.pulseEnJ)}${matchBadge(sol.errEn)}</div></div>
+      <div><div class="target-header">Pulse Overlap</div></div>
+      <div><div class="target-val">${fmtOv(targets.pulseOvPct)}</div></div>
+      <div><div class="target-val ${errPOv<=0.05?'match-good':errPOv<=0.2?'match-warn':'match-fail'}">${fmtOv(sol.actualPOvPct)}${matchBadge(errPOv)}</div></div>
+      <div><div class="target-header">Line Overlap</div></div>
+      <div><div class="target-val">${fmtOv(targets.lineOvPct)}</div></div>
+      <div><div class="target-val ${errLOv<=0.05?'match-good':errLOv<=0.2?'match-warn':'match-fail'}">${fmtOv(sol.actualLOvPct)}${matchBadge(errLOv)}</div></div>
+      <div><div class="target-header">Peak Power</div></div>
+      <div><div class="target-val">${fmtPk(targets.peakW)}</div></div>
+      <div><div class="target-val ${errPk<=0.2?'match-warn':'match-fail'}">${fmtPk(sol.actualPeakW)}${matchBadge(errPk)}</div></div>
+    </div>`;
+}
+
+function populateDstSettings(sol) {
+  if (!sol) return;
+  $('dst-freq').value  = sol.freqKHz.toFixed(1);
+  $('dst-power').value = sol.power.toFixed(1);
+  $('dst-pulse').value = sol.pulseNs != null ? sol.pulseNs : '—';
+  $('dst-speed').value = sol.speed.toFixed(1);
+  const dstLaser = getLaser($('dstModelSelect').value);
+  const liVal    = sol.lineInt > 0 ? (25.4 / sol.lineInt).toFixed(1) : '—';
+  $('dst-li').value    = liVal;
+  $('dstLILabel').textContent = 'LPI';
+  $('dstLIUnit').textContent  = 'lpi';
+  $('dstPulseRow').style.display = dstLaser && dstLaser.type === 'mopa' ? '' : 'none';
+  $('dstResultPanel').style.display = '';
+
+  // Effective average power at material
+  if (dstLaser) {
+    const effW = sol.pulseEnJ * sol.freqKHz * 1000;
+    const enStr = effW < 1e-3 ? (sol.pulseEnJ*1e6).toFixed(3)+' μJ' : (sol.pulseEnJ*1e3).toFixed(4)+' mJ';
+    $('dst-effpower').textContent = effW.toFixed(2) + ' W  (E_pulse × f = ' + enStr + ' × ' + sol.freqKHz.toFixed(1) + ' kHz)';
+    $('dst-effpower-row').style.display = '';
+  }
+}
+
+function showAlt(idx) {
+  [0,1,2].forEach(i => {
+    $('altTab'+i).classList.toggle('active', i === idx);
+  });
+  const sol = convAltSolutions[idx];
+  const targets = window._srcTargets;
+  $('altContent').innerHTML = sol
+    ? renderSolution(sol, targets) +
+      `<div style="margin-top:8px;font-size:0.6rem;color:var(--text-dim)">${['Prioritizes fluence and pulse energy match.','Prioritizes pulse and line overlap match.','Balanced across all parameters.'][idx]}</div>`
+    : '<div class="small-note">No alternative found.</div>';
+  // Also update solved settings display
+  if (sol) populateDstSettings(sol);
+}
+
+$('solveBtn').addEventListener('click', () => {
+  const targets = window._srcTargets;
+  if (!targets) return;
+  const srcLaser   = getLaser($('srcModelSelect').value);
+  const dstLaser   = getLaser($('dstModelSelect').value);
+  const dstFocalMm = parseFloat($('dstFocalLen').value) || 175;
+  const dstMSq     = parseFloat($('dstMSquared').value) || 1.5;
+  const fixedPw    = $('pwOverrideCheck').checked ? parseInt($('dstPulseOverride').value) : null;
+
+  // Store source pulse width so solver can use it for MOPA→MOPA priority
+  window._srcPulseNs = srcLaser && srcLaser.type === 'mopa'
+    ? parseInt($('srcPulseSelect').value) : null;
+
+  $('solveBtn').textContent = '⏳ Solving...';
+  $('solveBtn').disabled    = true;
+
+  setTimeout(() => {
+    // ── Power pre-check warning ───────────────────────────────
+    let powerWarning = '';
+    const srcEffectiveW = targets.outputWatts || (targets.pulseEnJ * targets.freqKHz * 1000);
+    const dstMaxW       = dstLaser.watts;
+    if (dstMaxW < srcEffectiveW * 0.7) {
+      powerWarning = `<div class="alt-banner" style="border-color:rgba(255,68,68,0.4);background:rgba(255,68,68,0.06);color:var(--red);margin-bottom:10px">
+        ⚠ POWER MISMATCH — Source effective power ~${srcEffectiveW.toFixed(1)}W, destination rated ${dstMaxW}W.
+        Exact match may not be possible. Results will be the closest achievable.
+      </div>`;
+    } else if (dstMaxW < srcEffectiveW) {
+      powerWarning = `<div class="alt-banner" style="margin-bottom:10px">
+        ⚠ Destination rated power (${dstMaxW}W) is lower than source effective power (~${srcEffectiveW.toFixed(1)}W).
+        Some parameters may not match exactly.
+      </div>`;
+    }
+
+    // ── Three solves with different weights ───────────────────
+    const primary  = solveForLaser(dstLaser, dstFocalMm, dstMSq, targets, fixedPw, getScoreWeights(srcLaser, 'balanced'));
+    convAltSolutions = [
+      solveForLaser(dstLaser, dstFocalMm, dstMSq, targets, fixedPw, getScoreWeights(srcLaser, 'fluence')),
+      solveForLaser(dstLaser, dstFocalMm, dstMSq, targets, fixedPw, getScoreWeights(srcLaser, 'overlap')),
+      primary,
+    ];
+
+    // Check if exact match (all key errors < 5%)
+    const errPOv   = primary && targets.pulseOvPct != null
+      ? Math.abs((primary.actualPOvPct - targets.pulseOvPct) / (Math.abs(targets.pulseOvPct)||1)) : 0;
+    const isExact  = primary && primary.errFlu <= 0.05 && primary.errEn <= 0.05 && errPOv <= 0.05;
+
+    populateDstSettings(primary || convAltSolutions[0]);
+    $('dstMatchPanel').style.display = '';
+
+    if (isExact) {
+      $('altSolutionsDiv').style.display = 'none';
+      $('matchRowsContainer').innerHTML = powerWarning + renderSolution(primary, targets);
+    } else {
+      $('altSolutionsDiv').style.display = '';
+      $('matchRowsContainer').innerHTML = powerWarning;
+      showAlt(0);
+    }
+
+    $('solveBtn').textContent = '⚡ Solve';
+    $('solveBtn').disabled    = false;
+  }, 50);
+});
+
+// ── Swap button ────────────────────────────────────────────────
+$('swapBtn').addEventListener('click', () => {
+  // Swap brand selections
+  const srcBrand = $('srcBrandSelect').value;
+  const dstBrand = $('dstBrandSelect').value;
+  $('srcBrandSelect').value = dstBrand; convBuildModelDropdown('srcBrandSelect','srcModelSelect','Select Model');
+  $('dstBrandSelect').value = srcBrand; convBuildModelDropdown('dstBrandSelect','dstModelSelect','Select Model');
+
+  // Swap model selections
+  const srcModel = $('srcModelSelect').value;
+  const dstModel = $('dstModelSelect').value;
+  $('srcModelSelect').value = dstModel;
+  $('dstModelSelect').value = srcModel;
+
+  // Update badges
+  convUpdateBadge(getLaser(dstModel), 'srcModelBadge');
+  convUpdateBadge(getLaser(srcModel), 'dstModelBadge');
+
+  // Swap optics
+  const srcFL = $('srcFocalLen').value; const dstFL = $('dstFocalLen').value;
+  $('srcFocalLen').value = dstFL; $('dstFocalLen').value = srcFL;
+  const srcM2 = $('srcMSquared').value; const dstM2 = $('dstMSquared').value;
+  $('srcMSquared').value = dstM2; $('dstMSquared').value = srcM2;
+
+  srcUpdatePulseDropdown();
+  dstUpdatePulseOverride();
+  convCalculateSourceTargets();
+  updateSolveBtn();
+  $('dstResultPanel').style.display = 'none';
+  $('dstMatchPanel').style.display  = 'none';
+});
+
+// ── Pre-populate destination from calculator ───────────────────
+function convPrePopulateDestination() {
+  const calcLaser = getLaser(modelSelect.value);
+  if (!calcLaser) return;
+
+  // Find brand in dst dropdown
+  const dstBrand = $('dstBrandSelect');
+  if (!dstBrand.querySelector(`option[value="${calcLaser.brand}"]`)) return;
+  dstBrand.value = calcLaser.brand;
+  convBuildModelDropdown('dstBrandSelect','dstModelSelect','Select Model');
+
+  const dstModel = $('dstModelSelect');
+  if (dstModel.querySelector(`option[value="${calcLaser.id}"]`)) {
+    dstModel.value = calcLaser.id;
+    convUpdateBadge(calcLaser, 'dstModelBadge');
+    dstUpdatePulseOverride();
+  }
+
+  // Pre-populate optics from calculator
+  $('dstFocalLen').value  = $('focalLen').value;
+  $('dstMSquared').value  = $('mSquared').value;
+
+  $('fromCalcBadge').style.display = 'inline';
+  updateSolveBtn();
+}
+
+// ── Send to Calculator ─────────────────────────────────────────
+$('sendToCalcBtn').addEventListener('click', sendToCalculator);
+
+function sendToCalculator() {
+  const dstLaser = getLaser($('dstModelSelect').value);
+  if (!dstLaser) return;
+
+  // Switch to calculator tab
+  $('tabCalc').classList.add('active');
+  $('tabConv').classList.remove('active');
+  $('contentCalc').classList.add('active');
+  $('contentConv').classList.remove('active');
+
+  // Set laser brand and model
+  buildBrandDropdown(dstLaser.brand);
+  buildModelDropdown();
+  modelSelect.value = dstLaser.id;
+  applyModel();
+
+  // Set optics
+  $('focalLen').value  = $('dstFocalLen').value;
+  $('mSquared').value  = $('dstMSquared').value;
+
+  // Set frequency
+  const freqKHz = parseFloat($('dst-freq').value) || 30;
+  freqManual.value = freqKHz;
+  freqSlider.value = Math.min(freqKHz, parseFloat(freqSlider.max));
+  updateSliderFill(freqSlider);
+
+  // Set power %
+  if (dstLaser.type === 'mopa') {
+    $('powerPercent').value = parseFloat($('dst-power').value) || 100;
+    // Set pulse width — find matching row in dropdown
+    const targetNs = parseInt($('dst-pulse').value);
+    const pulseOpts = [...$('pulseSelect').options];
+    const match = pulseOpts.find(o => parseInt(o.value) === targetNs);
+    if (match) {
+      $('pulseSelect').value = match.value;
+      applyPulseRow();
+    }
+  } else {
+    $('qswPowerPct').value = parseFloat($('dst-power').value) || 100;
+  }
+
+  // Set process parameters — speed
+  $('scanSpeed').value = parseFloat($('dst-speed').value) || 500;
+
+  // Set LPI — dst-li is always in LPI
+  const lpiVal = parseFloat($('dst-li').value);
+  if (lpiVal > 0) {
+    // Switch calculator to LPI mode if needed
+    if (!useLPI) $('btnLPI').click();
+    $('lpiVal').value = lpiVal.toFixed(1);
+  }
+
+  // Recalculate everything
+  calculate();
+  calculateOverlap();
+
+  // Flash the header to signal the transfer happened
+  const header = document.querySelector('header');
+  header.style.transition = 'border-color 0.1s';
+  header.style.borderColor = 'var(--cyan)';
+  setTimeout(() => { header.style.borderColor = ''; }, 800);
+}
+function initConverter() {
+  convBuildBrandDropdown('srcBrandSelect', 'Select Manufacturer');
+  convBuildBrandDropdown('dstBrandSelect', 'Select Manufacturer');
+  $('srcModelSelect').innerHTML = '<option value="">Select Model</option>';
+  $('dstModelSelect').innerHTML = '<option value="">Select Model</option>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+
+// Restore display settings before first render
+const ds = loadDisplaySettings();
+applyTheme(ds.light || false);
+applyFontSize(ds.fontSize || 'small');
+applyStretch(ds.stretch || false);
+
+// Fav button
+$('favBtn').addEventListener('click', () => {
+  const id = modelSelect.value;
+  if (!id) return;
+  const wasInFavView = brandSelect.value === '★ Favourites';
+  toggleFav(id);
+  const favsLeft = loadFavs().length;
+
+  if (wasInFavView && !isFav(id)) {
+    // Just unfavourited while viewing Favourites
+    if (favsLeft === 0) {
+      // No favourites left — drop back to the laser's real brand
+      const laser = getLaser(id);
+      const realBrand = (laser && laser.brand) || 'JPT';
+      buildBrandDropdown(realBrand);
+      buildModelDropdown(id);
+    } else {
+      // Still have favourites — rebuild the favourites list, pick first
+      buildBrandDropdown('★ Favourites');
+      buildModelDropdown();
+    }
+  } else {
+    // Normal toggle while in a regular brand view
+    buildBrandDropdown(brandSelect.value);
+    updateFavBtn();
+  }
+});
+
+// Restore last used laser, fall back to JPT first model
+const lastUsed = loadLastUsed();
+if (lastUsed && getLaser(lastUsed.id)) {
+  buildBrandDropdown(lastUsed.brand);
+  buildModelDropdown(lastUsed.id);
+} else {
+  buildBrandDropdown('JPT');
+  buildModelDropdown();
+}
+initConverter();
+</script>
+</body>
+</html>

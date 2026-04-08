@@ -1269,6 +1269,13 @@
     <div class="changelog-wrap">
 
     <div class="cl-entry">
+      <div class="cl-version">v5.11</div>
+      <ul class="cl-items">
+        <li>Fixed <strong>Parameter Converter swap button</strong> — manufacturer swapped correctly but model went blank; root cause was model values being read after dropdown rebuilds had already cleared them</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
       <div class="cl-version">v5.10</div>
       <ul class="cl-items">
         <li>Clarified below-cutoff MOPA physics — E/pulse and peak power are constant below cutoff while avg power scales linearly with frequency; this is correct MOPA behaviour, not a bug</li>
@@ -1495,7 +1502,7 @@
     <button class="db-btn" id="importBtn">Import DB</button>
     <button class="db-btn" id="exportExampleBtn">Export Example DB</button>
     <input type="file" id="importFileInput" accept=".json" style="display:none">
-    <span class="version">v5.10</span>
+    <span class="version">v5.11</span>
     <button class="db-btn" id="changelogBtn">📋 Changelog</button>
   </div>
   <div class="footer-note">FIBER LASER POWER CALCULATOR &nbsp;|&nbsp; MOPA: W = Hz × J (below cutoff) &nbsp;|&nbsp; Q-SW: E = P ÷ f, τ interpolated &nbsp;|&nbsp; THEORETICAL — VERIFY WITH HARDWARE</div>
@@ -4127,16 +4134,23 @@ $('solveBtn').addEventListener('click', () => {
 
 // ── Swap button ────────────────────────────────────────────────
 $('swapBtn').addEventListener('click', () => {
-  // Swap brand selections
+  // Capture everything BEFORE rebuilding any dropdowns
   const srcBrand = $('srcBrandSelect').value;
   const dstBrand = $('dstBrandSelect').value;
-  $('srcBrandSelect').value = dstBrand; convBuildModelDropdown('srcBrandSelect','srcModelSelect','Select Model');
-  $('dstBrandSelect').value = srcBrand; convBuildModelDropdown('dstBrandSelect','dstModelSelect','Select Model');
-
-  // Swap model selections
   const srcModel = $('srcModelSelect').value;
   const dstModel = $('dstModelSelect').value;
+  const srcFL = $('srcFocalLen').value;
+  const dstFL = $('dstFocalLen').value;
+  const srcM2 = $('srcMSquared').value;
+  const dstM2 = $('dstMSquared').value;
+
+  // Swap brands and rebuild model dropdowns, passing the swapped model ID to select
+  $('srcBrandSelect').value = dstBrand;
+  convBuildModelDropdown('srcBrandSelect', 'srcModelSelect', 'Select Model');
   $('srcModelSelect').value = dstModel;
+
+  $('dstBrandSelect').value = srcBrand;
+  convBuildModelDropdown('dstBrandSelect', 'dstModelSelect', 'Select Model');
   $('dstModelSelect').value = srcModel;
 
   // Update badges
@@ -4144,9 +4158,7 @@ $('swapBtn').addEventListener('click', () => {
   convUpdateBadge(getLaser(srcModel), 'dstModelBadge');
 
   // Swap optics
-  const srcFL = $('srcFocalLen').value; const dstFL = $('dstFocalLen').value;
   $('srcFocalLen').value = dstFL; $('dstFocalLen').value = srcFL;
-  const srcM2 = $('srcMSquared').value; const dstM2 = $('dstMSquared').value;
   $('srcMSquared').value = dstM2; $('dstMSquared').value = srcM2;
 
   srcUpdatePulseDropdown();

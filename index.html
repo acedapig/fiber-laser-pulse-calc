@@ -896,6 +896,15 @@
       </div>
     </div>
     <div class="small-note" style="margin-top:8px">Spec M² &lt;1.5 · 1.0 = diffraction limited</div>
+    <div class="sep"></div>
+    <div class="field">
+      <label>Curved Surface Ø <span style="font-size:0.5rem">(optional)</span></label>
+      <div class="input-wrap">
+        <input type="number" id="curvedDiam" value="" placeholder="e.g. 80" min="0.1" step="0.1">
+        <span class="unit">mm</span>
+      </div>
+    </div>
+    <div class="small-note" style="margin-top:6px">For engraving round objects without a rotary — enter the object's outer diameter to estimate depth of field and max engravable chord width</div>
   </div>
 
   <!-- PROCESS PARAMETERS -->
@@ -987,6 +996,18 @@
         <div class="readout-label">Line Overlap</div>
         <div class="readout-value" id="out-lineoverlap">—</div>
         <div class="readout-unit" id="out-lineoverlap-unit">%</div>
+      </div>
+      <div class="readout amber" id="readout-dof" data-outputs="dof" style="display:none">
+        <button class="tip-btn" data-tip="dof">?</button>
+        <div class="readout-label">Depth of Field</div>
+        <div class="readout-value" id="out-dof">—</div>
+        <div class="readout-unit">mm</div>
+      </div>
+      <div class="readout amber" id="readout-chord" data-outputs="chord" style="display:none">
+        <button class="tip-btn" data-tip="chord">?</button>
+        <div class="readout-label">Max Chord Width</div>
+        <div class="readout-value" id="out-chord">—</div>
+        <div class="readout-unit">mm</div>
       </div>
     </div>
     <div class="warning-bar" id="warn-bar">⚠ AVG POWER EXCEEDS RATED OUTPUT — CLAMPED TO <span id="warn-watts">30</span> W</div>
@@ -1269,6 +1290,15 @@
     <div class="changelog-wrap">
 
     <div class="cl-entry">
+      <div class="cl-version">v5.12</div>
+      <ul class="cl-items">
+        <li>Added <strong>Curved Surface Ø</strong> input under Beam Optics — for engraving round objects without a rotary</li>
+        <li>Added two new Output Analysis readouts: <strong>Depth of Field</strong> (2× Rayleigh range, accounting for M²) and <strong>Max Chord Width</strong> (widest engravable band across the curve that stays within depth of field)</li>
+        <li>Both new readouts are hidden until a curved surface diameter is entered; wired into input highlighting and tooltips with live formula values</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
       <div class="cl-version">v5.11</div>
       <ul class="cl-items">
         <li>Fixed <strong>Parameter Converter swap button</strong> — manufacturer swapped correctly but model went blank; root cause was model values being read after dropdown rebuilds had already cleared them</li>
@@ -1502,7 +1532,7 @@
     <button class="db-btn" id="importBtn">Import DB</button>
     <button class="db-btn" id="exportExampleBtn">Export Example DB</button>
     <input type="file" id="importFileInput" accept=".json" style="display:none">
-    <span class="version">v5.11</span>
+    <span class="version">v5.12</span>
     <button class="db-btn" id="changelogBtn">📋 Changelog</button>
   </div>
   <div class="footer-note">FIBER LASER POWER CALCULATOR &nbsp;|&nbsp; MOPA: W = Hz × J (below cutoff) &nbsp;|&nbsp; Q-SW: E = P ÷ f, τ interpolated &nbsp;|&nbsp; THEORETICAL — VERIFY WITH HARDWARE</div>
@@ -2686,6 +2716,7 @@ let LIVE = {
   spotDiamUm: 0, beamDiamMm: 7, focalLenMm: 175, mSq: 1.4,
   fluenceJcm2: 0, spotAreaCm2: 0,
   laserWatts: 60, cutoffKHz: 0, maxPulseEnJ: 0,
+  dofMm: 0, chordMm: 0, curvedDiamMm: 0,
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -2831,6 +2862,30 @@ function calculate() {
   else if (fluenceJcm2 >= 0.001) { fluenceDisplay = (fluenceJcm2*1000).toFixed(3);  fluenceUnit = 'mJ/cm²'; }
   else                           { fluenceDisplay = (fluenceJcm2*1e6).toFixed(3);   fluenceUnit = 'μJ/cm²'; }
 
+  // ── Curved surface: Depth of Field + Max Chord Width ──────────
+  let dofMm = 0, chordMm = 0;
+  const curvedDiamMm = parseFloat($('curvedDiam').value) || 0;
+  if (beamDiamMm > 0 && focalLenMm > 0) {
+    const spotDiamM_dof = mSq * (4 * LAMBDA_M * focalLenMm*1e-3) / (Math.PI * beamDiamMm*1e-3);
+    const w0 = spotDiamM_dof / 2; // beam waist radius, meters
+    const zR = (Math.PI * w0 * w0) / (mSq * LAMBDA_M); // Rayleigh range, meters
+    dofMm = 2 * zR * 1000;
+  }
+  if (curvedDiamMm > 0 && dofMm > 0) {
+    const R = curvedDiamMm / 2;
+    if (dofMm < curvedDiamMm) {
+      chordMm = 2 * Math.sqrt(Math.max(0, R*R - Math.pow(R - dofMm, 2)));
+    } else {
+      chordMm = curvedDiamMm; // DOF exceeds the object — whole width is in focus
+    }
+  }
+  $('readout-dof').style.display   = curvedDiamMm > 0 ? '' : 'none';
+  $('readout-chord').style.display = curvedDiamMm > 0 ? '' : 'none';
+  if (curvedDiamMm > 0) {
+    $('out-dof').textContent   = dofMm > 0 ? dofMm.toFixed(3) : '—';
+    $('out-chord').textContent = chordMm > 0 ? chordMm.toFixed(2) : '—';
+  }
+
   const [pulseEnDisplay, pulseEnUnit] = fmtEnergy(effectivePulseEnJ);
   const [peakDisplay,    peakUnit]    = fmtPower(effectivePeakW);
   const [periodDisplay,  periodUnit]  = fmtPeriod(periodUs);
@@ -2866,6 +2921,7 @@ function calculate() {
     maxPulseEnJ: laser.type === 'mopa'
       ? (parseFloat($('cutoffFreq').value) > 0 ? laserWatts / (parseFloat($('cutoffFreq').value) * 1000) : 0)
       : 0,
+    dofMm, chordMm, curvedDiamMm,
   };
 
   $('readout-watts').className  = 'readout ' + (clamped ? 'warn' : 'ok');
@@ -2899,7 +2955,7 @@ freqManual.addEventListener('input', () => {
   updateSliderFill(freqSlider);
   calculate();
 });
-['powerPercent','qswPowerPct','beamDiam','focalLen','mSquared'].forEach(id => $(id).addEventListener('input', calculate));
+['powerPercent','qswPowerPct','beamDiam','focalLen','mSquared','curvedDiam'].forEach(id => $(id).addEventListener('input', calculate));
 
 // ═══════════════════════════════════════════════════════════════
 //  PROCESS PARAMETERS — overlap / gap calculation
@@ -3275,6 +3331,14 @@ const HIGHLIGHT_MAP = {
     fieldIds: ['lpiVal', 'liVal', 'beamDiam', 'focalLen', 'mSquared'],
     panelIds: ['panelProcess', 'panelOptics'],
   },
+  dof: {
+    fieldIds: ['beamDiam', 'focalLen', 'mSquared', 'curvedDiam'],
+    panelIds: ['panelOptics'],
+  },
+  chord: {
+    fieldIds: ['beamDiam', 'focalLen', 'mSquared', 'curvedDiam'],
+    panelIds: ['panelOptics'],
+  },
 };
 
 function getHighlightTarget(id) {
@@ -3343,6 +3407,10 @@ const TOOLTIPS = {
                   formula: 'overlap% = (1 - pulse_spacing ÷ spot_diameter) × 100\npulse_spacing = speed ÷ frequency' },
   lineoverlap:  { desc: 'How much adjacent scan lines overlap (or gap) perpendicular to the scan direction. Determined by your LPI or line interval setting relative to the focused spot size.',
                   formula: 'overlap% = (1 - line_interval ÷ spot_diameter) × 100\nline_interval = 25.4 ÷ LPI' },
+  dof:     { desc: 'The axial range around the focal point where the beam stays acceptably small (2× Rayleigh range). Useful for engraving curved surfaces without a rotary — this tells you how much height variation stays in focus.',
+             formula: 'DOF = 2 × π × w₀² ÷ (M² × λ)\nw₀ = spot_diameter ÷ 2' },
+  chord:   { desc: 'On a round object of the entered diameter, this is the maximum chord width across the top of the curve that stays within the depth of field — i.e. the widest engraving band that remains in focus without using a rotary.',
+             formula: 'chord = 2 × √(R² − (R−DOF)²)\nR = curved_surface_Ø ÷ 2' },
 };
 
 function fmt(val, digits) { return val != null ? val.toFixed(digits) : '—'; }
@@ -3394,6 +3462,13 @@ function getLiveValues(key) {
       const spotMmL = (L.spotDiamUm/1000).toFixed(4);
       const lpct = L.lineOverlapPct != null ? L.lineOverlapPct.toFixed(1) : '—';
       return `${lpct}% = (1 - ${fmt(L.lineIntMm,4)}mm ÷ ${spotMmL}mm) × 100`;
+    case 'dof':
+      if (!L.dofMm) return 'Enter beam diameter and focal length';
+      return `${fmt(L.dofMm,3)} mm depth of field at current optics settings`;
+    case 'chord':
+      if (!L.curvedDiamMm || !L.chordMm) return 'Enter a curved surface diameter above';
+      const R = L.curvedDiamMm/2;
+      return `${fmt(L.chordMm,2)} mm = 2 × √(${fmt(R,1)}² − (${fmt(R,1)}−${fmt(L.dofMm,3)})²)`;
     default: return '';
   }
 }
